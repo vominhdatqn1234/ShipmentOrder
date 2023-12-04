@@ -9,6 +9,7 @@ import {
   Button,
   Input,
   InputRef,
+  Modal,
   Popconfirm,
   Space,
   Table,
@@ -37,6 +38,7 @@ import { useOrders } from "./useOrders";
 import { v4 as uuid } from "uuid";
 import { OrdersModel } from "../../models/OrdersModel";
 import { useUser } from "../../store/useUser";
+import EditOrder from "./EditOrder";
 const currentDate = dayjs();
 const dateFormat = "DD-MM-YYYY";
 
@@ -61,7 +63,7 @@ const OrderList = () => {
     price: "",
     total: "",
     status: "",
-    files: "",
+    files: [],
     partnerOrderId: "",
     quality: "",
   });
@@ -299,9 +301,6 @@ const OrderList = () => {
       key: "files",
       render: (text, record) => (
         <div className="flex items-center gap-1">
-          {/* <ColorButton override={colors.primary} type="primary" size="small">
-            Upload File
-          </ColorButton> */}
           <Tooltip title="Download File">
             <ColorButton
               override={colors.primary}
@@ -311,21 +310,16 @@ const OrderList = () => {
               onClick={async (event: any) => {
                 event.preventDefault();
                 const file = (record as any)?.files[0];
-                fetch(file?.url)
-                  .then((response) => response.blob())
-                  .then((blob) => {
-                    const url = window.URL.createObjectURL(new Blob([blob]));
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = file?.name;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                  })
-                  .catch((error) => {
-                    console.error("Error downloading file:", error);
-                  });
+                const link = document.createElement("a");
+                link.href = file?.url;
+                link.download = file?.name;
+                document.body.appendChild(link);
+
+                // Trigger a click on the link to start the download
+                link.click();
+
+                // Remove the link from the document
+                document.body.removeChild(link);
               }}
             />
           </Tooltip>
@@ -364,8 +358,8 @@ const OrderList = () => {
 
               <Tooltip title="Xoá">
                 <Popconfirm
-                  title="Xóa hợp đồng"
-                  description="Bạn có chắc là muốn xóa hợp đồng?"
+                  title="Xóa order"
+                  description="Bạn có chắc là muốn xóa?"
                   icon={
                     <QuestionCircleOutlined style={{ color: colors.red2 }} />
                   }
@@ -409,8 +403,8 @@ const OrderList = () => {
         bordered
         scroll={{ x: 900 }}
       />
-      {/* <Modal
-        title="Cập nhật hợp đồng"
+      <Modal
+        title="Cập nhật"
         open={opened}
         footer={null}
         onCancel={handleCancel}
@@ -420,12 +414,12 @@ const OrderList = () => {
           height: "calc(100vh - 250px)",
         }}
       >
-        <EditContract
+        <EditOrder
           defaultValues={defaultValues}
           handleCancel={handleCancel}
           refetch={refetch}
         />
-      </Modal> */}
+      </Modal>
     </div>
   );
 };

@@ -1,3 +1,9 @@
+export type FileType = {
+  id: string;
+  name: string;
+  alt: string;
+  url: string
+}
 export type OrdersModel = {
   id: string;
   partnerOrderId: string;
@@ -7,7 +13,7 @@ export type OrdersModel = {
   price: string;
   total: string;
   status: string;
-  files: string;
+  files: FileType[];
   created: string;
   quality: string;
 };

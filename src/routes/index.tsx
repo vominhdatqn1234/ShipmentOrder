@@ -1,7 +1,6 @@
 import { lazy } from "react";
 import { Navigate } from "react-router-dom";
 import Loadable from "../components/Loadable";
-import { useUser } from "../store/useUser";
 
 /****Layouts*****/
 
@@ -17,9 +16,7 @@ const Contract = Loadable(lazy(() => import("../pages/Contract")));
 const CreateContract = Loadable(
   lazy(() => import("../pages/Contract/CreateContract"))
 );
-const OrderList = Loadable(
-  lazy(() => import("../pages/OrderList"))
-);
+const OrderList = Loadable(lazy(() => import("../pages/OrderList")));
 const CreateContractType = Loadable(
   lazy(() => import("../pages/Contract/CreateContractType"))
 );
@@ -95,7 +92,7 @@ const managerPage = [
     path: "/manager-page/home-page",
     name: "HomePage",
     exact: true,
-    element: <HomePage />,
+    element: <OrderList />,
   },
   {
     path: "/manager-page/about-me-page",
@@ -147,7 +144,7 @@ const childrenAdmin = [
     path: "/",
     name: "Home",
     exact: true,
-    element: <Home />,
+    element: <OrderList />,
   },
   {
     path: "/contract-list",
