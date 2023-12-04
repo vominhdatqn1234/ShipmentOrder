@@ -1,0 +1,14 @@
+.analytics-report {
+    overflow: hidden;
+
+    &::before {
+        content: " ";
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        transform: unset;
+        background: url('https://firebasestorage.googleapis.com/v0/b/mardoll-studio.appspot.com/o/welcome.svg?alt=media&token=8ad2ffbd-54d7-47d9-b5ce-2a86875d6cd5') 0% 0% / 40% no-repeat;
+        background-repeat: no-repeat;
+        background-position: right -9px top 0px;
+    }
+}

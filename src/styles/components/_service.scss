@@ -1,0 +1,19 @@
+.overlay {
+    @apply flex relative flex-col justify-center items-center h-full px-8 py-4 transition-transform duration-500 group-hover:scale-110 bg-gradient-to-b from-transparent via-transparent to-black/5 group-hover:from-black/70 group-hover:via-black/60 group-hover:to-black/70;
+    &:hover {
+        .border-animate {
+            &::after, &::before {
+                @apply border-[white] w-full h-full
+            }
+        }
+    }
+    .border-animate {
+        @apply px-8 py-8 relative text-center;
+        &::after {
+            @apply content-[""] absolute right-0 top-0 w-0 h-0 border-t-[3px] border-t-[transparent] border-solid border-r-[3px] border-r-[transparent] transition-all duration-[0.8s] ease-[ease]
+        }
+        &::before {
+            @apply content-[""] absolute left-0 bottom-0 w-0 h-0 border-b-[3px] border-b-[transparent] border-solid border-l-[3px] transition-all duration-[0.8s] ease-[ease] 
+        }
+    }
+}
