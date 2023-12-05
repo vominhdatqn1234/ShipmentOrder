@@ -39,6 +39,7 @@ import { v4 as uuid } from "uuid";
 import { OrdersModel } from "../../models/OrdersModel";
 import { useUser } from "../../store/useUser";
 import EditOrder from "./EditOrder";
+import ExcelReader from "../../components/ExcelReader";
 const currentDate = dayjs();
 const dateFormat = "DD-MM-YYYY";
 
@@ -50,13 +51,12 @@ const OrderList = () => {
   const searchInput = useRef<InputRef>(null);
   const queryClient = useQueryClient();
   const { data: contractData, isLoading, refetch } = useOrders();
-  console.log("contractData", contractData);
   const collectionRef = collection(firestore, "orders");
   const [opened, setOpened] = useState(false);
   const { user } = useUser();
   const [defaultValues, setDefaultValues] = useState<OrdersModel>({
     id: "",
-    customer: "",
+    name: "",
     phone: "",
     address: "",
     created: "",
@@ -65,7 +65,10 @@ const OrderList = () => {
     status: "",
     files: [],
     partnerOrderId: "",
-    quality: "",
+    quantity: "",
+    size: "",
+    userId: user?.id || "",
+    type: "",
   });
 
   const handleSearch = (
@@ -229,7 +232,7 @@ const OrderList = () => {
 
   const columns: ColumnsType<OrdersModel> = [
     {
-      title: "Partner OrderId",
+      title: "OrderId",
       dataIndex: "partnerOrderId",
       key: "partnerOrderId",
       // fixed: "left",
@@ -238,9 +241,9 @@ const OrderList = () => {
     },
     {
       title: "Customer",
-      dataIndex: "customer",
-      key: "customer",
-      sorter: (a, b) => a.customer.localeCompare(b.customer),
+      dataIndex: "name",
+      key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name),
       sortDirections: ["descend", "ascend"],
     },
     {
@@ -249,20 +252,25 @@ const OrderList = () => {
       key: "address",
     },
     {
-      title: "Quality",
-      dataIndex: "quality",
-      key: "quality",
+      title: "Size",
+      dataIndex: "size",
+      key: "size",
     },
     {
-      title: "Price",
-      dataIndex: "price",
-      key: "price",
-      sorter: (a, b) => a.price.localeCompare(b.price),
-      sortDirections: ["descend", "ascend"],
-      render: (text: string) => {
-        return <p>{formatCurrency(text)}</p>;
-      },
+      title: "Quantity",
+      dataIndex: "quantity",
+      key: "quantity",
     },
+    // {
+    //   title: "Price",
+    //   dataIndex: "price",
+    //   key: "price",
+    //   sorter: (a, b) => a.price.localeCompare(b.price),
+    //   sortDirections: ["descend", "ascend"],
+    //   render: (text: string) => {
+    //     return <p>{formatCurrency(text)}</p>;
+    //   },
+    // },
     {
       title: "Total",
       dataIndex: "total",
@@ -270,7 +278,7 @@ const OrderList = () => {
       sorter: (a, b) => a.total.localeCompare(b.total),
       sortDirections: ["descend", "ascend"],
       render: (text: string) => {
-        return <p>{formatCurrency(text)}</p>;
+        return <p>{text} $</p>;
       },
     },
     // {
@@ -294,37 +302,6 @@ const OrderList = () => {
       title: "Tracking",
       dataIndex: "tracking",
       key: "tracking",
-    },
-    {
-      title: "File",
-      dataIndex: "files",
-      key: "files",
-      render: (text, record) => (
-        <div className="flex items-center gap-1">
-          <Tooltip title="Download File">
-            <ColorButton
-              override={colors.primary}
-              type="primary"
-              size="small"
-              icon={<DownloadOutlined />}
-              onClick={async (event: any) => {
-                event.preventDefault();
-                const file = (record as any)?.files[0];
-                const link = document.createElement("a");
-                link.href = file?.url;
-                link.download = file?.name;
-                document.body.appendChild(link);
-
-                // Trigger a click on the link to start the download
-                link.click();
-
-                // Remove the link from the document
-                document.body.removeChild(link);
-              }}
-            />
-          </Tooltip>
-        </div>
-      ),
     },
   ];
 

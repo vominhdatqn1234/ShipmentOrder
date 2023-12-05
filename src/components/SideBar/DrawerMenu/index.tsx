@@ -108,16 +108,17 @@ const DrawerMenu: ForwardRefRenderFunction<DrawerMenuRef, DrawerProps> = (
     : null;
 
   const contractItem =
-    isAdmin || isManager
-      ? getItem("Orders", "contract", <FaFileContract />, [
+    // isAdmin || isManager
+    //   ? 
+      getItem("Orders", "contract", <FaFileContract />, [
           getItem("Order List", "contract-list", <FaRegListAlt />),
-          getItem("Create Order", "create-contract", <MdOutlinePlaylistAdd />),
+          // getItem("Create Order", "create-contract", <MdOutlinePlaylistAdd />),
           // isAdmin ? getItem("Danh sách loại hợp đồng", "contract-type-list", <FaRegListAlt />) : null,
           // isAdmin ? getItem("Tạo loại hợp đồng", "create-contract-type", <MdOutlinePlaylistAdd />) : null,
           // isAdmin ? getItem("Danh sách danh mục phát", "services-arising-list", <FaRegListAlt />) : null,
           // isAdmin ? getItem("Tạo danh mục phát", "create-services-arising", <MdOutlinePlaylistAdd />) : null,
         ])
-      : null;
+      // : null;
 
   const items: MenuItem[] = [
     // getItem(

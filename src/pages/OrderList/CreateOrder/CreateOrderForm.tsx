@@ -1,40 +1,52 @@
+import { InboxOutlined, SearchOutlined } from "@ant-design/icons";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
-import type { UploadProps } from "antd";
 import {
   Button,
-  DatePicker,
   Form as FormAntDeisgn,
+  Image,
   Input,
-  InputNumber,
+  InputRef,
+  Space,
+  Table,
   Upload,
+  UploadProps,
   message,
 } from "antd";
 import type { FormInstance } from "antd/es/form";
 import dayjs, { Dayjs } from "dayjs";
 import { collection } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { isEmpty } from "lodash";
+import { find, isEmpty, isNull, lowerCase, map } from "lodash";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "react-query";
-import { InboxOutlined } from "@ant-design/icons";
-
+// import {
+//   FileAddOutlined,
+//   QuestionCircleOutlined,
+//   SearchOutlined,
+//   DownloadOutlined,
+// } from "@ant-design/icons";
+import { ColumnsType } from "antd/es/table";
+import { ColumnType, FilterConfirmProps } from "antd/es/table/interface";
+import { getJsDateFromExcel } from "excel-date-to-js";
+import Highlighter from "react-highlight-words";
+import { AiOutlineEye } from "react-icons/ai";
 import { v4 as uuidv4 } from "uuid";
+import * as XLSX from "xlsx";
 import * as yup from "yup";
-import { PrintContract } from "../../../components/ComponentToPrint/PrintContract";
-import Editor from "../../../components/Editor";
 import { FormItem } from "../../../components/Form";
-import { firestore, storage } from "../../../lib/firebase";
+import { firestore } from "../../../lib/firebase";
 import { OrdersModel } from "../../../models/OrdersModel";
 import { useUser } from "../../../store/useUser";
 import { isVietnamesePhoneNumber } from "../../../utils";
+import { useContractType } from "../../Contract/ContractTypeList/useContractType";
 import { useOrders } from "../useOrders";
 
 const { Dragger } = Upload;
 
 const currentDate = dayjs();
 const dateFormat = "DD-MM-YYYY";
+type DataIndex = keyof OrdersModel;
 
 const defaultValues = {
   customer: "",
@@ -50,15 +62,15 @@ const defaultValues = {
 
 const schema = yup
   .object({
-    phone: yup
-      .string()
-      .required("Vui lòng nhập số điện thoại của bạn!")
-      .test("phone", "Số điên thoại sai định dạng", (str, context) => {
-        return isVietnamesePhoneNumber(str);
-      }),
-    price: yup.string().required("Vui lòng giá"),
-    created: yup.date().required("Chọn ngày ký hợp đồng"),
-    address: yup.string().required("Vui lòng địa chỉ"),
+    // phone: yup
+    //   .string()
+    //   .required("Vui lòng nhập số điện thoại của bạn!")
+    //   .test("phone", "Số điên thoại sai định dạng", (str, context) => {
+    //     return isVietnamesePhoneNumber(str);
+    //   }),
+    // price: yup.string().required("Vui lòng giá"),
+    // created: yup.date().required("Chọn ngày ký hợp đồng"),
+    // address: yup.string().required("Vui lòng địa chỉ"),
   })
   .required();
 
@@ -69,12 +81,18 @@ export default function CreateOrderForm() {
   const [loading, setLoading] = useState(false);
   const contractRef = collection(firestore, "orders");
   const [fileList, setFileList] = useState<any[]>([]);
+  const [fileExcelData, setFileExcelData] = useState<any[]>([]);
   const mutation = useFirestoreCollectionMutation(contractRef);
   const { refetch } = useOrders();
+  const { data: productType } = useContractType();
   const queryClient = useQueryClient();
   const uuId = uuidv4();
   const { user } = useUser();
   const isAdmin = user?.permission === "Admin";
+  const [searchText, setSearchText] = useState("");
+  const [searchedColumn, setSearchedColumn] = useState("");
+  const searchInput = useRef<InputRef>(null);
+
   const {
     control,
     handleSubmit,
@@ -89,7 +107,6 @@ export default function CreateOrderForm() {
 
   const handleUpload = async (info: any) => {
     if (info.file.status === "done") {
-      console.log("info.file", info.file);
       setFileList([
         {
           id: uuidv4(),
@@ -145,35 +162,115 @@ export default function CreateOrderForm() {
 
   const customRequest = async ({ file, onSuccess, onError }: any) => {
     try {
-      const storageRef = ref(storage, `/files/${file.name}`);
+      //   const storageRef = ref(storage, `/files/${file.name}`);
 
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      //   const uploadTask = uploadBytesResumable(storageRef, file);
+      const reader = new FileReader();
+      const calculateSum = (data: any) => {
+        // Assuming your Excel file has a column named 'price'
+        const mapProductType = map(productType as any, (item) => ({
+          ...item,
+          name: lowerCase(item?.name),
+        }));
 
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const percent = Math.round(
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-          );
-
-          // update progress
-          // setPercent(percent);
-        },
-        (err) => console.log(err),
-        () => {
-          // download url
-          getDownloadURL(uploadTask.snapshot.ref).then((url) => {
-            onSuccess();
-            handleUpload({
-              file: {
-                status: "done",
-                name: file.name,
-                url,
-              },
-            });
+        const mapFileExcel = map(data, (item) => {
+          const isExistItem = find(mapProductType as any, {
+            name: lowerCase(item["Type"]),
+            size: item["Size"],
           });
-        }
-      );
+          const quantity = !isNull(item["Quantity"])
+            ? `${item["Quantity"]}`
+            : "1";
+          function getDirectImageLink(originalLink: string) {
+            if (!originalLink.includes("drive.google.com")) {
+              console.error("Invalid Google Drive link.");
+              return originalLink;
+            }
+            const fileId = extractFileId(originalLink);
+
+            if (fileId) {
+              return `https://drive.google.com/uc?export=download&id=${fileId}`;
+            } else {
+              console.error("Invalid Google Drive link.");
+              return null;
+            }
+          }
+
+          function extractFileId(originalLink: string) {
+            const match = originalLink.match(/\/file\/d\/(.*?)(?:\/|$)/);
+            return match ? match[1] : null;
+          }
+
+          return {
+            created: dayjs(getJsDateFromExcel(item["Date"])).toISOString(),
+            address: item["Address line 1"] || "",
+            city: item["City"] || "",
+            imageFront: getDirectImageLink(item["Design Front"] || ""),
+            imageBack: getDirectImageLink(item["Design Back"] || ""),
+            name: `${item["First name"]} ${item["Last name"]}`,
+            partnerOrderId: item["Order ID"] || "",
+            quantity,
+            type: item["Type"] || "",
+            size: item["Size"] || "",
+            tracking: item["Tracking"] || "",
+            price: `${isExistItem?.priceOneSide}`,
+            shipPrice: `${isExistItem?.shipPrice}`,
+            total: `${parseFloat(
+              +quantity * +isExistItem?.priceOneSide + isExistItem?.shipPrice
+            ).toFixed(2)}`,
+            userId: user?.id,
+          };
+        });
+        setFileExcelData(mapFileExcel);
+      };
+
+      reader.onload = (e: any) => {
+        const data = e.target.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+        // Do something with the jsonData (e.g., calculate sum)
+        calculateSum(jsonData);
+      };
+
+      reader.readAsBinaryString(file);
+
+      message.success(`${file.name} file uploaded successfully`);
+
+      //   handleUpload({
+      //     file: {
+      //       status: "done",
+      //       name: file.name,
+      //       url,
+      //     })
+
+      //   uploadTask.on(
+      //     "state_changed",
+      //     (snapshot) => {
+      //       const percent = Math.round(
+      //         (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+      //       );
+
+      //       // update progress
+      //       // setPercent(percent);
+      //     },
+      //     (err) => console.log(err),
+      //     () => {
+      //       // download url
+      //       getDownloadURL(uploadTask.snapshot.ref).then((url) => {
+      //         onSuccess();
+      //         handleUpload({
+      //           file: {
+      //             status: "done",
+      //             name: file.name,
+      //             url,
+      //           },
+      //         });
+      //       });
+      //     }
+      //   );
     } catch (error) {
       console.error("Error uploading file:", error);
       onError();
@@ -192,12 +289,260 @@ export default function CreateOrderForm() {
     },
   };
 
+  const handleSearch = (
+    selectedKeys: string[],
+    confirm: (param?: FilterConfirmProps) => void,
+    dataIndex: DataIndex
+  ) => {
+    confirm();
+    setSearchText(selectedKeys[0]);
+    setSearchedColumn(dataIndex);
+  };
+
+  const handleReset = (clearFilters: () => void) => {
+    clearFilters();
+    setSearchText("");
+  };
+
+  const getColumnSearchProps = (
+    dataIndex: DataIndex,
+    type: "created" | "phone"
+  ): ColumnType<OrdersModel> => ({
+    filterDropdown: ({
+      setSelectedKeys,
+      selectedKeys,
+      confirm,
+      clearFilters,
+      close,
+    }) => (
+      <div style={{ padding: 8 }} onKeyDown={(e) => e.stopPropagation()}>
+        <Input
+          ref={searchInput}
+          placeholder={`Search ${dataIndex}`}
+          value={selectedKeys[0]}
+          onChange={(e) =>
+            setSelectedKeys(e.target.value ? [e.target.value] : [])
+          }
+          onPressEnter={() =>
+            handleSearch(selectedKeys as string[], confirm, dataIndex)
+          }
+          style={{ marginBottom: 8, display: "block" }}
+        />
+        <Space>
+          <Button
+            type="primary"
+            onClick={() =>
+              handleSearch(selectedKeys as string[], confirm, dataIndex)
+            }
+            icon={<SearchOutlined />}
+            size="small"
+            style={{ width: 90 }}
+          >
+            Search
+          </Button>
+          <Button
+            onClick={() => clearFilters && handleReset(clearFilters)}
+            size="small"
+            style={{ width: 90 }}
+          >
+            Reset
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              confirm({ closeDropdown: false });
+              setSearchText((selectedKeys as string[])[0]);
+              setSearchedColumn(dataIndex);
+            }}
+          >
+            Filter
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              close();
+            }}
+          >
+            close
+          </Button>
+        </Space>
+      </div>
+    ),
+    filterIcon: (filtered: boolean) => (
+      <SearchOutlined style={{ color: filtered ? "#1677ff" : undefined }} />
+    ),
+    onFilter: (value: any, record: OrdersModel) =>
+      record[dataIndex]
+        .toString()
+        .toLowerCase()
+        .includes((value as string).toLowerCase()),
+    onFilterDropdownOpenChange: (visible: any) => {
+      if (visible) {
+        setTimeout(() => searchInput.current?.select(), 100);
+      }
+    },
+    render: (text, record) => {
+      if (type === "created") {
+        return (
+          <>
+            {searchedColumn === dataIndex ? (
+              <Highlighter
+                highlightStyle={{ backgroundColor: "#ffc069", padding: 0 }}
+                searchWords={[searchText]}
+                autoEscape
+                textToHighlight={
+                  text
+                    ? type === "created"
+                      ? dayjs(text).format("DD/MM/YYYY").toString()
+                      : text.toString()
+                    : ""
+                }
+              />
+            ) : type === "created" ? (
+              dayjs(text).format("DD/MM/YYYY")
+            ) : (
+              text
+            )}
+          </>
+        );
+      }
+      return (
+        <div className="flex flex-col gap-2 items-center">
+          {searchedColumn === dataIndex ? (
+            <Highlighter
+              highlightStyle={{ backgroundColor: "#ffc069", padding: 0 }}
+              searchWords={[searchText]}
+              autoEscape
+              textToHighlight={text ? text?.toString() : ""}
+            />
+          ) : (
+            <p className="text-base">{text}</p>
+          )}
+        </div>
+      );
+    },
+  });
+
+  const columns: ColumnsType<OrdersModel> = [
+    {
+      title: "OrderId",
+      dataIndex: "partnerOrderId",
+      key: "partnerOrderId",
+      // fixed: "left",
+      //   width: "15%",
+      ...getColumnSearchProps("partnerOrderId", "phone"),
+    },
+    {
+      title: "Customer",
+      dataIndex: "name",
+      key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name),
+      sortDirections: ["descend", "ascend"],
+    },
+    {
+      title: "Address",
+      dataIndex: "address",
+      key: "address",
+    },
+    {
+      title: "Type",
+      dataIndex: "type",
+      key: "type",
+    },
+    {
+      title: "Size",
+      dataIndex: "size",
+      key: "size",
+    },
+    {
+      title: "Design Front",
+      dataIndex: "imageFront",
+      key: "imageFront",
+      render: (text, record) => {
+        console.log("text", text);
+        return (
+          <div className="flex flex-col gap-2 items-center">
+            <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
+              <Image
+                src={text}
+                width={40}
+                height={40}
+                preview={{
+                  mask: <AiOutlineEye />,
+                }}
+              />
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: "Design Back",
+      dataIndex: "imageBack",
+      key: "imageBack",
+      render: (text, record) => {
+        console.log("text", text);
+        return (
+          <div className="flex flex-col items-center">
+            <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
+              <Image
+                src={text}
+                width={40}
+                height={40}
+                preview={{
+                  mask: <AiOutlineEye />,
+                }}
+              />
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: "Quantity",
+      dataIndex: "quantity",
+      key: "quantity",
+    },
+
+    {
+      title: "Total",
+      dataIndex: "total",
+      key: "total",
+      sorter: (a, b) => a.total.localeCompare(b.total),
+      sortDirections: ["descend", "ascend"],
+    },
+    // {
+    //   title: "Phone",
+    //   dataIndex: "phone",
+    //   key: "phone",
+    //   ...getColumnSearchProps("phone", "phone"),
+    // },
+    {
+      title: "Created",
+      dataIndex: "created",
+      key: "created",
+      sorter: (a, b) => a.created.localeCompare(b.created),
+      sortDirections: ["descend", "ascend"],
+      ...getColumnSearchProps("created", "created"),
+      // render: (text: string) => {
+      //   return <p>{dayjs(text).format("DD/MM/YYYY")}</p>;
+      // },
+    },
+    {
+      title: "Tracking",
+      dataIndex: "tracking",
+      key: "tracking",
+    },
+  ];
+
   return (
     <>
       {contextHolder}
-      <div className="py-6">
+      {/* <div className="py-6">
         <PrintContract getValues={getValues} />
-      </div>
+      </div> */}
       <FormAntDeisgn
         form={form}
         name="control-create-order-ref"
@@ -205,14 +550,30 @@ export default function CreateOrderForm() {
         layout="vertical"
         initialValues={defaultValues}
         onFinish={handleSubmit((data) => {
-          const payload: OrdersModel = {
-            ...data,
-            files: fileList,
-            total: `${+data?.quality * +data?.price}`,
-            created: data?.created?.toISOString?.() || "",
-          };
-          console.log("payload", payload);
-          mutation.mutate(payload);
+          // const payload: OrdersModel = {
+          //   ...data,
+          //   files: fileList,
+          //   total: `${+data?.quality * +data?.price}`,
+          //   created: data?.created?.toISOString?.() || "",
+          // };
+          // const payload = {
+          //   orderId: user?.id,
+          //   data: fileExcelData,
+          //   created: dayjs()?.toISOString?.() || "",
+          // };
+          fileExcelData.forEach(
+            (item) =>
+              new Promise((resolve, reject) => {
+                try {
+                  mutation.mutate(item);
+                  resolve(item);
+                } catch (error) {
+                  reject(error);
+                }
+              })
+          );
+          // console.log("payload", payload);
+          // mutation.mutate(payload);
           queryClient.invalidateQueries("orders");
           setTimeout(async () => await refetch(), 300);
           setLoading(true);
@@ -225,9 +586,10 @@ export default function CreateOrderForm() {
           form.resetFields();
           formRef.current?.resetFields();
           reset();
+          setFileExcelData([]);
         })}
       >
-        <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
+        {/* <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
           <FormItem
             control={control}
             name="partnerOrderId"
@@ -241,8 +603,8 @@ export default function CreateOrderForm() {
           <FormItem control={control} name="phone" label="Số điện thoại">
             <Input allowClear placeholder="Nhập số điện thoại" />
           </FormItem>
-        </div>
-        <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
+        </div> */}
+        {/* <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
           <FormItem control={control} name="address" label="Địa chỉ">
             <Input allowClear placeholder="Nhập địa chỉ" />
           </FormItem>
@@ -274,8 +636,8 @@ export default function CreateOrderForm() {
               }
             />
           </FormItem>
-        </div>
-        <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
+        </div> */}
+        {/* <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
           <FormItem
             control={control}
             name="tracking"
@@ -297,7 +659,16 @@ export default function CreateOrderForm() {
               style={{ width: "100%" }}
             />
           </FormItem>
-        </div>
+        </div> */}
+        {fileExcelData.length > 0 && (
+          <Table
+            rowKey={(record) => `${uuidv4()}-${record.id}`}
+            columns={columns}
+            dataSource={fileExcelData}
+            bordered
+            scroll={{ x: 900 }}
+          />
+        )}
         <div className="py-6">
           <FormItem
             control={control}
@@ -326,7 +697,7 @@ export default function CreateOrderForm() {
         </div> */}
         <Button
           loading={loading}
-          disabled={!isEmpty(errors)}
+          disabled={fileExcelData.length <= 0}
           type="primary"
           htmlType="submit"
           block

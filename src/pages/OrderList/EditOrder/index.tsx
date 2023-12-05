@@ -87,17 +87,17 @@ export default function EditOrder({
     form.setFieldsValue({
       id: defaultValues.id,
       partnerOrderId: defaultValues.partnerOrderId,
-      customer: defaultValues?.customer,
+      name: defaultValues?.name,
       phone: defaultValues?.phone,
       address: defaultValues?.address,
       price: defaultValues?.price,
       total: defaultValues?.total,
       status: defaultValues?.status,
       created: defaultValues?.created,
-      quality: defaultValues?.quality,
+      quantity: defaultValues?.quantity,
     });
   }, [defaultValues, form]);
-  console.log("defaultValues", defaultValues);
+
   const handleUpload = async (info: any) => {
     if (info.file.status === "done") {
       setFileList([
@@ -194,7 +194,7 @@ export default function EditOrder({
           const payload: OrdersModel = {
             ...data,
             files: fileList,
-            total: `${+data?.quality * +data?.price}`,
+            total: `${+data?.quantity * +data?.price}`,
             created: dayjs(data.created).toISOString() || "",
           };
           console.log("payload", payload);
@@ -223,7 +223,7 @@ export default function EditOrder({
           >
             <Input allowClear placeholder="Nhập mã order của khách hàng" />
           </FormItem>
-          <FormItem control={control} name="customer" label="Tên khách hàng">
+          <FormItem control={control} name="name" label="Tên khách hàng">
             <Input allowClear placeholder="Nhập tên khách hàng" />
           </FormItem>
           <FormItem control={control} name="phone" label="Số điện thoại">

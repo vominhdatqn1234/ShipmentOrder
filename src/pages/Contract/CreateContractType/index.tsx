@@ -13,7 +13,7 @@ const CreateContractType = () => {
               title: "Trang chủ",
             },
             {
-              title: "Tạo loại hợp đồng",
+              title: "Tạo loại sản phẩm",
             },
           ]}
         />

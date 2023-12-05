@@ -30,10 +30,11 @@ import { useContractType } from "./useContractType";
 import { ContractType } from "../../../models/ContractModel";
 import { formatCurrency } from "../../../utils";
 import EditContractType from "../EditContractType";
+import { ProductType } from "../../../models/ProductTypeModel";
 // import EditWeddingDressType from "../EditWeddingDressType";
 // import { useWeddingDressType } from "./useWeddingDressType";
 
-type DataIndex = keyof ContractType;
+type DataIndex = keyof ProductType;
 
 const ContractTypeList = () => {
   const [searchText, setSearchText] = useState("");
@@ -41,12 +42,15 @@ const ContractTypeList = () => {
   const searchInput = useRef<InputRef>(null);
   const queryClient = useQueryClient();
   const { data: contractTypeData, isLoading, refetch } = useContractType();
+  console.log('data', contractTypeData)
   const collectionRef = collection(firestore, "contractType");
   const [opened, setOpened] = useState(false);
-  const [defaultValues, setDefaultValues] = useState<ContractType>({
-    contractName: "",
-    contractPrice: "",
-    contractType: "",
+  const [defaultValues, setDefaultValues] = useState<ProductType>({
+    name: "",
+    priceOneSide: "",
+    priceTwoSides: "",
+    shipPrice: "",
+    size: "",
     id: "",
   });
 
@@ -76,7 +80,7 @@ const ContractTypeList = () => {
     setTimeout(async () => await refetch(), 300);
   }
 
-  const handleEditContractType = (record: ContractType) => () => {
+  const handleEditContractType = (record: ProductType) => () => {
     setDefaultValues({
       ...record,
     });
@@ -86,7 +90,7 @@ const ContractTypeList = () => {
   const getColumnSearchProps = (
     dataIndex: DataIndex,
     type: "orderItems" | "phone" = "orderItems"
-  ): ColumnType<ContractType> => ({
+  ): ColumnType<ProductType> => ({
     filterDropdown: ({
       setSelectedKeys,
       selectedKeys,
@@ -152,7 +156,7 @@ const ContractTypeList = () => {
     filterIcon: (filtered: boolean) => (
       <SearchOutlined style={{ color: filtered ? "#1677ff" : undefined }} />
     ),
-    onFilter: (value: any, record: ContractType) =>
+    onFilter: (value: any, record: ProductType) =>
      `${record?.[dataIndex] || ''}`
         .toString()
         .toLowerCase()
@@ -180,30 +184,50 @@ const ContractTypeList = () => {
     },
   });
 
-  const columns: ColumnsType<ContractType> = [
-    {
-      title: "Mã loại hợp đồng",
-      dataIndex: "contractType",
-      key: "contractType",
-      sorter: (a, b) => a.contractType.localeCompare(b.contractType),
-      sortDirections: ["descend", "ascend"],
-    },
+  const columns: ColumnsType<ProductType> = [
     {
       title: "Tên loại hợp đồng",
-      dataIndex: "contractName",
-      key: "contractName",
-      sorter: (a, b) => a.contractName.localeCompare(b.contractName),
+      dataIndex: "name",
+      key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name),
       sortDirections: ["descend", "ascend"],
-      ...getColumnSearchProps('contractName')
+      ...getColumnSearchProps('name')
     },
     {
-      title: "Giá loại hợp đồng",
-      dataIndex: "contractPrice",
-      key: "contractPrice",
-      sorter: (a, b) => a.contractPrice.localeCompare(b.contractPrice),
+      title: "Size",
+      dataIndex: "size",
+      key: "size",
+      sorter: (a, b) => a.size.localeCompare(b.size),
+      sortDirections: ["descend", "ascend"],
+    },
+    {
+      title: "Giá 1 mặt",
+      dataIndex: "priceOneSide",
+      key: "priceOneSide",
+      sorter: (a, b) => a.priceOneSide.localeCompare(b.priceOneSide),
       sortDirections: ["descend", "ascend"],
       render: (text: string) => {
-        return <p>{formatCurrency(text)}</p>;
+        return <p>{text} $</p>;
+      },
+    },
+    {
+      title: "Giá 2 mặt",
+      dataIndex: "priceTwoSides",
+      key: "priceTwoSides",
+      sorter: (a, b) => a.priceTwoSides.localeCompare(b.priceTwoSides),
+      sortDirections: ["descend", "ascend"],
+      render: (text: string) => {
+        return <p>{text} $</p>;
+      },
+    },
+    {
+      title: "Ship",
+      dataIndex: "shipPrice",
+      key: "shipPrice",
+      sorter: (a, b) => a.shipPrice.localeCompare(b.shipPrice),
+      sortDirections: ["descend", "ascend"],
+      render: (text: string) => {
+        return <p>{text} $</p>;
       },
     },
     {
@@ -282,7 +306,7 @@ const ContractTypeList = () => {
         bodyStyle={{ overflowY: "scroll", height: "calc(100vh - 250px)" }}
       >
         <EditContractType
-          defaultValues={defaultValues}
+          defaultValues={defaultValues as any}
           handleCancel={handleCancel}
           refetch={refetch}
         />

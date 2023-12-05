@@ -20,9 +20,11 @@ import DrawerMenu, { DrawerMenuRef } from "../SideBar/DrawerMenu";
 import useWindowSize from "../../hooks/useWindowSize";
 import { useWindowSizeMenu } from "../../store/useWindowSizeMenu";
 import { cn } from "../../lib/cs";
+import { useOrders } from "../../pages/OrderList/useOrders";
 
 const Navbar = () => {
   const { user, setUser } = useUser();
+  const { refetch } = useOrders();
   const [token, setToken] = useLocalStorage("token", null);
   const { name, avatar } = user || {};
   const navigate = useNavigate();
@@ -34,6 +36,7 @@ const Navbar = () => {
     setUser({});
     setToken(null);
     navigate("/login");
+    refetch?.();
   };
   const items: MenuProps["items"] = [
     {
@@ -70,12 +73,12 @@ const Navbar = () => {
       )}
     >
       <DrawerMenu ref={drawerMenuRef} />
-        <AiOutlineMenu
-          className="cursor-pointer"
-          onClick={handleShowDrawerMenu}
-          color={colors.primary}
-          size={25}
-        />
+      <AiOutlineMenu
+        className="cursor-pointer"
+        onClick={handleShowDrawerMenu}
+        color={colors.primary}
+        size={25}
+      />
       <div className="flex items-center cursor-pointer p-1 gap-3 rounded-lg">
         <Tooltip title="Chat">
           <BsChatLeft color={colors.primary} size={25} />
