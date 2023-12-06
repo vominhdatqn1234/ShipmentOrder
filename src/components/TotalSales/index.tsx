@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Chart from "react-apexcharts";
 import { colors } from "../../styles/colors";
 import { Divider, Select, SelectProps } from "antd";
@@ -6,26 +6,35 @@ import dayjs from "dayjs";
 import { useContract } from "../../pages/Contract/useContract";
 import { findIndex, groupBy, keys, map, sumBy } from "lodash";
 import { formatCurrency } from "../../utils";
+import { collection, getDocs, query } from "firebase/firestore";
+import { firestore } from "../../lib/firebase";
 
 export default function TotalSales() {
   const currentYear = `${dayjs().year()}`;
-  const { data: contractData } = useContract();
+  const [ordersData, setOrdersData] = useState<any[]>([]);
   const [defaultYear, setDefaultYear] = useState<string>(currentYear);
-  const filteredData = useMemo(() => {
-    return contractData.filter((item) => {
-      return (
-        item.status === "active" || item.status === "complete"
-      );
-    });
-  }, [contractData]);
 
-  const groupedData = groupBy(filteredData, (item) =>
-    item.createDate.substring(0, 4)
+  useEffect(() => {
+    const handleQuery = async () => {
+      const ref = query(collection(firestore, "orders"));
+      const querySnapshot = await getDocs(ref);
+      let data: any = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+
+      setOrdersData(data);
+    };
+    handleQuery();
+  }, []);
+
+  const groupedData = groupBy(ordersData, (item) =>
+    item.created.substring(0, 4)
   );
   const labels = keys(groupedData);
 
   const seriesTotalSales = map(groupedData, (yearData) =>
-    sumBy(yearData, (item) => +item.totalPrice)
+    sumBy(yearData, (item) => +`${parseFloat(item.total)}`)
   );
 
   const handleChange = (value: SelectProps["onChange"]) => {
@@ -74,7 +83,7 @@ export default function TotalSales() {
       fillSeriesColor: false,
       y: {
         formatter: function (val: any) {
-          return formatCurrency(`${val}`);
+          return `${val} $`;
         },
       },
     },
@@ -95,11 +104,12 @@ export default function TotalSales() {
       <div className="flex justify-between items-center px-6">
         <p className="text-base text-[rgb(119,126,137)]">Doanh thu hàng năm</p>
         <h2 className="text-xl font-bold leading-3">
-          {formatCurrency(
+          {
             +seriesTotalSales?.[
               findIndex(labels, (e) => e === defaultYear)
             ] as any
-          )}
+          }{" "}
+          $
         </h2>
       </div>
       <div className="flex items-center justify-center">

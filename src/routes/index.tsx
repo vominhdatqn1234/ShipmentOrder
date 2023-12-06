@@ -144,7 +144,7 @@ const childrenAdmin = [
     path: "/",
     name: "Home",
     exact: true,
-    element: <OrderList />,
+    element: <Home />,
   },
   {
     path: "/contract-list",

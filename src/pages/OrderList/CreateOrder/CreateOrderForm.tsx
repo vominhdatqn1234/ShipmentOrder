@@ -213,6 +213,7 @@ export default function CreateOrderForm() {
             type: item["Type"] || "",
             size: item["Size"] || "",
             tracking: item["Tracking"] || "",
+            phone: item["Phone"] || "",
             price: `${isExistItem?.priceOneSide}`,
             shipPrice: `${isExistItem?.shipPrice}`,
             total: `${parseFloat(

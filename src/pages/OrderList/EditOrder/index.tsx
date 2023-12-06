@@ -27,6 +27,8 @@ import { ContractModel } from "../../../models";
 import { useUser } from "../../../store/useUser";
 import { isVietnamesePhoneNumber } from "../../../utils";
 import { OrdersModel } from "../../../models/OrdersModel";
+import { useOrderSlice } from "../../../store/useOrderSlice";
+import {produce} from "immer"
 const { Dragger } = Upload;
 
 const currentDate = dayjs();
@@ -34,14 +36,14 @@ const dateFormat = "DD-MM-YYYY";
 
 const schema = yup
   .object({
-    phone: yup
-      .string()
-      .required("Vui lòng nhập số điện thoại của bạn!")
-      .test("phone", "Số điên thoại sai định dạng", (str, context) => {
-        return isVietnamesePhoneNumber(str);
-      }),
-    created: yup.date().required("Chọn ngày ký hợp đồng"),
-    address: yup.string().required("Vui lòng địa chỉ"),
+    // phone: yup
+    //   .string()
+    //   .required("Vui lòng nhập số điện thoại của bạn!")
+    //   .test("phone", "Số điên thoại sai định dạng", (str, context) => {
+    //     return isVietnamesePhoneNumber(str);
+    //   }),
+    // created: yup.date().required("Chọn ngày ký hợp đồng"),
+    // address: yup.string().required("Vui lòng địa chỉ"),
   })
   .required();
 
@@ -58,14 +60,15 @@ export default function EditOrder({
   const [form] = FormAntDeisgn.useForm();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
+  const { orders, setOrders } = useOrderSlice()
   const contractRef = collection(firestore, "orders");
-  const queryClient = useQueryClient();
+  // const queryClient = useQueryClient();
   const { user } = useUser();
   const isAdmin = user?.permission === "Admin";
 
-  const [fileList, setFileList] = useState<any[]>(
-    (defaultValues as any).files || []
-  );
+  // const [fileList, setFileList] = useState<any[]>(
+  //   (defaultValues as any).files || []
+  // );
   const uuId = uuidv4();
 
   const {
@@ -95,91 +98,92 @@ export default function EditOrder({
       status: defaultValues?.status,
       created: defaultValues?.created,
       quantity: defaultValues?.quantity,
+      tracking: defaultValues?.tracking,
     });
   }, [defaultValues, form]);
 
-  const handleUpload = async (info: any) => {
-    if (info.file.status === "done") {
-      setFileList([
-        {
-          id: uuId,
-          url: info.file.url,
-          name: info.file.name,
-        },
-      ]);
-      setValue("files", [
-        {
-          id: uuId,
-          url: info.file.url,
-          name: info.file.name,
-        },
-      ]);
-      message.success(`${info.file.name} file uploaded successfully`);
-    } else if (info.file.status === "error") {
-      message.error(`${info.file.name} file upload failed.`);
-    }
-  };
+  // const handleUpload = async (info: any) => {
+  //   if (info.file.status === "done") {
+  //     setFileList([
+  //       {
+  //         id: uuId,
+  //         url: info.file.url,
+  //         name: info.file.name,
+  //       },
+  //     ]);
+  //     setValue("files", [
+  //       {
+  //         id: uuId,
+  //         url: info.file.url,
+  //         name: info.file.name,
+  //       },
+  //     ]);
+  //     message.success(`${info.file.name} file uploaded successfully`);
+  //   } else if (info.file.status === "error") {
+  //     message.error(`${info.file.name} file upload failed.`);
+  //   }
+  // };
 
-  const customRequest = async ({ file, onSuccess, onError }: any) => {
-    try {
-      const storageRef = ref(storage, `/files/${file.name}`);
+  // const customRequest = async ({ file, onSuccess, onError }: any) => {
+  //   try {
+  //     const storageRef = ref(storage, `/files/${file.name}`);
 
-      const uploadTask = uploadBytesResumable(storageRef, file);
+  //     const uploadTask = uploadBytesResumable(storageRef, file);
 
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const percent = Math.round(
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-          );
+  //     uploadTask.on(
+  //       "state_changed",
+  //       (snapshot) => {
+  //         const percent = Math.round(
+  //           (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+  //         );
 
-          // update progress
-          // setPercent(percent);
-        },
-        (err) => console.log(err),
-        () => {
-          // download url
-          getDownloadURL(uploadTask.snapshot.ref).then((url) => {
-            onSuccess();
-            handleUpload({
-              file: {
-                status: "done",
-                name: file.name,
-                url,
-              },
-            });
-          });
-        }
-      );
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      onError();
-    }
-  };
-  const handleChange: UploadProps["onChange"] = ({ fileList: newFileList }) => {
-    if (fileList.length > 0) {
-      const matchingUrls = fileList?.reduce((result: any, image: any) => {
-        if (newFileList.some((file: any) => image?.id?.includes(file?.id))) {
-          result.push(image);
-        }
-        return result;
-      }, []);
-      setFileList(matchingUrls);
-      setValue("contractImage", matchingUrls);
-    }
-  };
-  const props: UploadProps = {
-    name: "file",
-    multiple: true,
-    listType: "picture",
-    // beforeUpload,
-    customRequest,
-    onChange: handleChange,
-    fileList,
-    onDrop(e) {
-      console.log("Dropped files", e.dataTransfer.files);
-    },
-  };
+  //         // update progress
+  //         // setPercent(percent);
+  //       },
+  //       (err) => console.log(err),
+  //       () => {
+  //         // download url
+  //         getDownloadURL(uploadTask.snapshot.ref).then((url) => {
+  //           onSuccess();
+  //           handleUpload({
+  //             file: {
+  //               status: "done",
+  //               name: file.name,
+  //               url,
+  //             },
+  //           });
+  //         });
+  //       }
+  //     );
+  //   } catch (error) {
+  //     console.error("Error uploading file:", error);
+  //     onError();
+  //   }
+  // };
+  // const handleChange: UploadProps["onChange"] = ({ fileList: newFileList }) => {
+  //   if (fileList.length > 0) {
+  //     const matchingUrls = fileList?.reduce((result: any, image: any) => {
+  //       if (newFileList.some((file: any) => image?.id?.includes(file?.id))) {
+  //         result.push(image);
+  //       }
+  //       return result;
+  //     }, []);
+  //     setFileList(matchingUrls);
+  //     setValue("contractImage", matchingUrls);
+  //   }
+  // };
+  // const props: UploadProps = {
+  //   name: "file",
+  //   multiple: true,
+  //   listType: "picture",
+  //   // beforeUpload,
+  //   customRequest,
+  //   onChange: handleChange,
+  //   fileList,
+  //   onDrop(e) {
+  //     console.log("Dropped files", e.dataTransfer.files);
+  //   },
+  // };
 
   return (
     <>
@@ -193,15 +197,23 @@ export default function EditOrder({
         onFinish={handleSubmit(async (data: OrdersModel) => {
           const payload: OrdersModel = {
             ...data,
-            files: fileList,
-            total: `${+data?.quantity * +data?.price}`,
+            // files: fileList,
+            total: `${+data?.quantity * parseFloat(data?.price)}`,
+            tracking: `${data?.tracking || ''}`,
             created: dayjs(data.created).toISOString() || "",
           };
-          console.log("payload", payload);
+          const updatedOrdersArray = produce(orders, (order: any) => {
+            const indexToUpdate = order.findIndex((item: OrdersModel) => item.id === payload.id)
+            if (indexToUpdate !== -1) {
+              order[indexToUpdate] = payload
+            }
+          })
+          setOrders(updatedOrdersArray)
+          console.log("payload", updatedOrdersArray, payload);
           const docRef = doc(contractRef, defaultValues.id);
           await updateDoc(docRef, payload);
-          queryClient.invalidateQueries("orders");
-          setTimeout(async () => await refetch(), 300);
+          // queryClient.invalidateQueries("orders");
+          // setTimeout(async () => await refetch(), 300);
           setLoading(true);
           messageApi.open({
             type: "success",
@@ -236,7 +248,7 @@ export default function EditOrder({
           </FormItem>
           <FormItem
             control={control}
-            name="quality"
+            name="quantity"
             label="Số lượng"
             valuePropName="value"
           >
@@ -286,7 +298,7 @@ export default function EditOrder({
             />
           </FormItem>
         </div>
-        <div className="py-6">
+        {/* <div className="py-6">
           <FormItem
             control={control}
             name="files"
@@ -306,7 +318,7 @@ export default function EditOrder({
               </p>
             </Dragger>
           </FormItem>
-        </div>
+        </div> */}
         {/* <div className="pb-20 ">
           <FormItem control={control} name="notes" label="Ghi chú">
             <Editor />

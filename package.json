@@ -21,6 +21,7 @@
     "faker": "^6.6.6",
     "firebase": "^10.3.0",
     "firebase-admin": "^11.10.1",
+    "immer": "^10.0.3",
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
     "quill-emoji": "^0.2.0",

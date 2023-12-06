@@ -297,7 +297,7 @@ export default function CreateEmployeeForm() {
           <FormItem control={control} name="permission" label="Quyền">
             <Select>
               <Select.Option value="Admin">Admin</Select.Option>
-              <Select.Option value="Manager">Manager</Select.Option>
+              {/* <Select.Option value="Manager">Manager</Select.Option> */}
               <Select.Option value="Employee">Employee</Select.Option>
             </Select>
           </FormItem>

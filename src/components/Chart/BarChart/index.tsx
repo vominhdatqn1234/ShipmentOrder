@@ -3,21 +3,29 @@ import Chart from "react-apexcharts";
 import dayjs from "dayjs";
 import { PlusOutlined } from "@ant-design/icons";
 import { formatCurrency, formatNumber } from "../../../utils";
-import { Button, Divider, Input, InputRef, Select, Space, Tooltip } from "antd";
+import {
+  Button,
+  DatePicker,
+  Divider,
+  Input,
+  InputRef,
+  Select,
+  Space,
+  Tooltip,
+} from "antd";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { firestore } from "../../../lib/firebase";
 import { toast } from "react-toastify";
 
 let index = 0;
-const currentYear = dayjs().year();
+const currentYear = dayjs();
 
-export default function BarChart() {
-  const [contractData, setContractData] = useState<any[]>([]);
+export default function BarChartRevenue() {
+  const [ordersData, setOrdersData] = useState<any[]>([]);
   const [items, setItems] = useState([`${currentYear}`]);
-  const [defaultValue, setDefaultValue] = useState<number>(currentYear);
+  const [defaultValue, setDefaultValue] = useState<any>(currentYear);
   const [name, setName] = useState("");
   const inputRef = useRef<InputRef>(null);
-
   const onNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setName(event.target.value);
   };
@@ -47,40 +55,61 @@ export default function BarChart() {
   };
   // Lọc dữ liệu chỉ trong năm 2023
   const filteredData = useMemo(() => {
-    return contractData.filter((item) => {
-      const itemYear = dayjs(item?.dueDate).year();
-      return itemYear === +defaultValue && item.status === "complete";
+    return ordersData.filter((item) => {
+      const itemYear = dayjs(item?.created).year();
+      const itemMonth = dayjs(item?.created).month();
+      console.log(
+        "defaultValue",
+        itemMonth,
+        +dayjs(defaultValue).month(),
+        itemMonth === +dayjs(defaultValue).month()
+      );
+      return (
+        itemYear === +dayjs(defaultValue).year() &&
+        itemMonth === +dayjs(defaultValue).month()
+      );
     });
-  }, [contractData, defaultValue]);
+  }, [ordersData, defaultValue]);
 
   // Lấy danh sách tháng từ dữ liệu lọc
+  // const uniqueMonths = Array.from(
+  //   new Set(
+  //     filteredData.map((item) => {
+  //       // return dayjs(item.createDate).month() + 1
+  //       return item.created.substring(5, 7);
+  //     })
+  //   )
+  // );
   const uniqueMonths = Array.from(
-    new Set(
-      filteredData.map((item) => {
-        // return dayjs(item.createDate).month() + 1
-        return item.dueDate.substring(5, 7);
-      })
-    )
+    new Set(filteredData.map((item) => dayjs(item.created).format("DD/MM")))
   );
+  // console.log('uniqueMonths', uniqueDaysOnly)
+
+  const sortedDays = uniqueMonths.sort((a, b) => +a - +b);
+  const labels = sortedDays.map((day) => `${day}`);
+
+  // console.log('uniqueMonths', labelsss, )
 
   // Sắp xếp danh sách tháng theo thứ tự
-  const sortedMonths = uniqueMonths.sort((a, b) => a - b);
+  // const sortedMonths = uniqueMonths.sort((a, b) => a - b);
 
   // Tạo danh sách labels từ danh sách tháng
-  const labels = sortedMonths.map((month) => `Tháng ${month}`);
+  // const labels = sortedMonths.map((month) => `Tháng ${month}`);
 
   // Tạo datasets với tổng giá trị cho từng tháng
   const datasets = filteredData.reduce((result: any, item) => {
-    const itemMonth = item.dueDate.substring(5, 7);
-    // const itemMonth = dayjs(item.createDate).month() + 1;
-    const dataIndex = sortedMonths.indexOf(itemMonth);
+    // const itemMonth = item.created.substring(5, 7);
+
+    const itemDay = item.created.substring(8, 10);
+    const itemMonth = item.created.substring(5, 7);
+    const dataIndex = sortedDays.indexOf(`${itemDay}/${itemMonth}`);
 
     if (dataIndex !== -1) {
-      if (!result[item.contractType]) {
-        result[item.contractType] = Array(sortedMonths.length).fill(0);
+      if (!result[item.type]) {
+        result[item.type] = Array(sortedDays.length).fill(0);
       }
 
-      result[item.contractType][dataIndex] += +item.totalPrice;
+      result[item.type][dataIndex] += `${parseFloat(item.total)}`;
     }
 
     return result;
@@ -111,11 +140,11 @@ export default function BarChart() {
     },
     yaxis: {
       title: {
-        text: "VNĐ",
+        text: "Dollar",
       },
       labels: {
         formatter: function (value: any) {
-          return formatNumber(+value);
+          return `${parseFloat(value)}`;
         },
       },
     },
@@ -126,7 +155,7 @@ export default function BarChart() {
       theme: "dark",
       y: {
         formatter: function (val: any) {
-          return formatCurrency(`${val}`);
+          return `${parseFloat(val).toFixed(2)} $`;
         },
       },
     },
@@ -134,25 +163,23 @@ export default function BarChart() {
 
   useEffect(() => {
     const handleQuery = async () => {
+      // const todayStart = dayjs().startOf('day');
+      // // const todayEnd = dayjs().endOf('day');
+      // const sixDaysAgo = dayjs().subtract(6, 'days').startOf('day');
+      const startOfMonth = dayjs(defaultValue).startOf("month");
+      const endOfMonth = dayjs(defaultValue).endOf("month");
       const ref = query(
-        collection(firestore, "contract"),
-        where(
-          "createDate",
-          ">=",
-          dayjs(`${+defaultValue}-01-01`).toISOString()
-        ),
-        where(
-          "createDate",
-          "<",
-          dayjs(`${+defaultValue + 1}-01-01`).toISOString()
-        )
+        collection(firestore, "orders"),
+        where("created", ">=", startOfMonth.toISOString()),
+        where("created", "<=", endOfMonth.toISOString())
       );
       const querySnapshot = await getDocs(ref);
       let data: any = [];
       querySnapshot.forEach((doc) => {
         data.push({ id: doc.id, ...doc.data() });
       });
-      setContractData(data);
+
+      setOrdersData(data);
     };
     handleQuery();
   }, [defaultValue]);
@@ -165,8 +192,13 @@ export default function BarChart() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h4>Doanh thu tháng trong năm</h4>
-        <Select
+        <h4>Doanh thu các ngày trong tháng hiện tại</h4>
+        <DatePicker
+          defaultValue={defaultValue}
+          picker="month"
+          onChange={(val) => setDefaultValue(val)}
+        />
+        {/* <Select
           defaultValue={{ value: `${currentYear}`, label: `${currentYear}` }}
           style={{ width: 200 }}
           placeholder="Filter theo năm"
@@ -191,7 +223,7 @@ export default function BarChart() {
             </>
           )}
           options={items.map((item) => ({ label: item, value: item }))}
-        />
+        /> */}
       </div>
       <Chart options={options} series={series} type="bar" />
     </div>

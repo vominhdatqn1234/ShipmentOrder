@@ -13,10 +13,10 @@ export type OrdersModel = {
   price: string;
   total: string;
   status: string;
-  files: FileType[];
   created: string;
   quantity: string;
   size: string;
   type: string;
   userId: string;
+  tracking: string;
 };

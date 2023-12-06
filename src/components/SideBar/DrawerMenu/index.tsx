@@ -136,7 +136,7 @@ const DrawerMenu: ForwardRefRenderFunction<DrawerMenuRef, DrawerProps> = (
     //   "home",
     //   null
     // ),
-    // itemDashBoard,
+    itemDashBoard,
     getItem(
       "Pages",
       "pages",

@@ -120,7 +120,7 @@ const SideBar: React.FC = () => {
       "home",
       null
     ),
-    // ecommerceItem,
+    ecommerceItem,
 
     getItem(
       "Pages",

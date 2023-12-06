@@ -23,18 +23,12 @@ export default function Home() {
           <div className="analytics-report-container">
             <div className="analytics-report bg-white rounded-3xl drop-shadow-lg p-[14px]">
               <p className="text-lg font-semibold leading-4 text-gray-900">
-                Hey Minh Dat
+                Hey {user?.name}
               </p>
-              <p className="text-lg font-semibold leading-4 text-gray-900">
-                Download Latest Report
-              </p>
-              <div className="pb-6">
-                <Button type="primary">Download</Button>
-              </div>
+              <div className="pb-6"></div>
             </div>
-            <div className="grid grid-cols-2 mt-4 gap-6">
+            <div className="grid grid-cols-1 mt-4 gap-6">
               <TotalIncome />
-              <AreaChart />
             </div>
           </div>
           <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
@@ -42,19 +36,19 @@ export default function Home() {
           </div>
         </div>
         <div>
-          <div className="grid grid-cols-2 gap-6 py-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
             <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
               <BarChartRevenue />
             </div>
             <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
               <BarChart />
             </div>
-            <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
+            {/* <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
               <BarChartArising />
             </div>
             <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
               <BarchartDiscount />
-            </div>
+            </div> */}
           </div>
         </div>
         {/* <div className="grid grid-cols-2 gap-3 h-[100px] mt-6">

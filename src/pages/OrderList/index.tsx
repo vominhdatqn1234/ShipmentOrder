@@ -40,6 +40,9 @@ import { OrdersModel } from "../../models/OrdersModel";
 import { useUser } from "../../store/useUser";
 import EditOrder from "./EditOrder";
 import ExcelReader from "../../components/ExcelReader";
+import RangePickerOrder from "./RangePickerOrder";
+import { useOrdersHook } from "./useOrdersHook";
+import { useOrderSlice } from "../../store/useOrderSlice";
 const currentDate = dayjs();
 const dateFormat = "DD-MM-YYYY";
 
@@ -51,6 +54,9 @@ const OrderList = () => {
   const searchInput = useRef<InputRef>(null);
   const queryClient = useQueryClient();
   const { data: contractData, isLoading, refetch } = useOrders();
+  useOrdersHook()
+  const { orders: orderData } = useOrderSlice()
+
   const collectionRef = collection(firestore, "orders");
   const [opened, setOpened] = useState(false);
   const { user } = useUser();
@@ -63,12 +69,12 @@ const OrderList = () => {
     price: "",
     total: "",
     status: "",
-    files: [],
     partnerOrderId: "",
     quantity: "",
     size: "",
     userId: user?.id || "",
     type: "",
+    tracking: '',
   });
 
   const handleSearch = (
@@ -302,6 +308,9 @@ const OrderList = () => {
       title: "Tracking",
       dataIndex: "tracking",
       key: "tracking",
+          render: (text: string) => {
+        return <p>{text || '--'}</p>
+      }
     },
   ];
 
@@ -312,7 +321,7 @@ const OrderList = () => {
       key: "editDelete",
       render: (text, record) => (
         <div className="flex items-center gap-1">
-          <Tooltip title="Upload File">
+          {/* <Tooltip title="Upload File">
             <ColorButton
               override={colors.primary}
               type="primary"
@@ -320,7 +329,7 @@ const OrderList = () => {
               icon={<FileAddOutlined />}
               onClick={handleEditContract(record)}
             />
-          </Tooltip>
+          </Tooltip> */}
           {user?.permission === "Admin" ? (
             <>
               <Tooltip title="Chỉnh sửa">
@@ -359,6 +368,9 @@ const OrderList = () => {
 
   return (
     <div className="m-6 p-2 md:p-4 bg-white rounded-3xl">
+      <div className="py-4">
+        <RangePickerOrder />
+      </div>
       <div className="mb-4">
         <Breadcrumb
           items={[
@@ -372,11 +384,11 @@ const OrderList = () => {
           ]}
         />
       </div>
-
+        
       <Table
         rowKey={(record) => `${uuid()}-${record.id}`}
         columns={columns}
-        dataSource={contractData}
+        dataSource={orderData}
         bordered
         scroll={{ x: 900 }}
       />
