@@ -56,7 +56,7 @@ const SideBar: React.FC = () => {
         "Dashboard",
         "dashboard",
         null,
-        [getItem("Ecommerce", "ecommerce", <FcSalesPerformance />)],
+        [getItem("Thống kê daonh thu", "ecommerce", <FcSalesPerformance />)],
         "group"
       )
     : null;
@@ -69,8 +69,8 @@ const SideBar: React.FC = () => {
 
   const contractItem =
       getItem("Orders", "contract", <FaFileContract />, [
-          getItem("Order List", "contract-list", <FaRegListAlt />),
-          getItem("Create Order", "create-contract", <MdOutlinePlaylistAdd />),
+          getItem("Danh sách đơn hàng", "contract-list", <FaRegListAlt />),
+          getItem("Tạo đơn hàng", "create-contract", <MdOutlinePlaylistAdd />),
           isAdmin
             ? getItem(
                 "Danh sách loại sản phẩm",
@@ -108,15 +108,8 @@ const SideBar: React.FC = () => {
         to="/"
         className="items-center justify-center gap-3 ml-3 flex text-xl font-extrabold tracking-tight text-slate-900"
       >
-        <img
-          src="/output-onlinepngtools-1.png"
-          className="object-cover w-[80px] h-[40px]"
-        />
-        {/* <span>RoxanaTech Studio</span> */}
+       Teement
       </Link>,
-      // <Link to="/" className="grid place-items-center">
-
-      //   </Link>,
       "home",
       null
     ),
