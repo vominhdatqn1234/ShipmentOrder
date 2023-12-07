@@ -201,6 +201,8 @@ export default function CreateOrderForm() {
             return match ? match[1] : null;
           }
 
+          const designPrice = !isEmpty(getDirectImageLink(item["Design Front"] || "")) && !isEmpty(getDirectImageLink(item["Design Back"] || "")) ? isExistItem?.priceTwoSides : isExistItem?.priceOneSide
+          console.log('designPrice', designPrice)
           return {
             created: dayjs(getJsDateFromExcel(item["Date"])).toISOString(),
             address: item["Address line 1"] || "",
@@ -215,10 +217,10 @@ export default function CreateOrderForm() {
             tracking: item["Tracking"] || "",
             phone: item["Phone"] || "",
             color: item["Color"] || "",
-            price: `${isExistItem?.priceOneSide}`,
+            price: `${+designPrice}`,
             shipPrice: `${isExistItem?.shipPrice}`,
             total: `${parseFloat(
-              +quantity * +isExistItem?.priceOneSide + isExistItem?.shipPrice
+              +quantity * +designPrice + isExistItem?.shipPrice
             ).toFixed(2)}`,
             userId: user?.id,
           };
@@ -468,18 +470,19 @@ export default function CreateOrderForm() {
       dataIndex: "imageFront",
       key: "imageFront",
       render: (text, record) => {
-        console.log("text", text);
         return (
           <div className="flex flex-col gap-2 items-center">
             <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
-              <Image
-                src={text}
-                width={40}
-                height={40}
-                preview={{
-                  mask: <AiOutlineEye />,
-                }}
-              />
+              {!isEmpty(text) ? (
+                 <Image
+                 src={text}
+                 width={40}
+                 height={40}
+                 preview={{
+                   mask: <AiOutlineEye />,
+                 }}
+               />
+              ) : '--'}
             </div>
           </div>
         );
@@ -494,14 +497,16 @@ export default function CreateOrderForm() {
         return (
           <div className="flex flex-col items-center">
             <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
-              <Image
-                src={text}
-                width={40}
-                height={40}
-                preview={{
-                  mask: <AiOutlineEye />,
-                }}
-              />
+            {!isEmpty(text) ? (
+                 <Image
+                 src={text}
+                 width={40}
+                 height={40}
+                 preview={{
+                   mask: <AiOutlineEye />,
+                 }}
+               />
+              ) : '--'}
             </div>
           </div>
         );
