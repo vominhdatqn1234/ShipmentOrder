@@ -1,21 +1,15 @@
 import { Avatar, Tooltip } from "antd";
-import React, { useEffect, useState } from "react";
-import { colors } from "../../styles/colors";
-import { FaDongSign } from "react-icons/fa6";
-import { useContract } from "../../pages/Contract/useContract";
-import { sumBy } from "lodash";
-import { formatCurrency, formatNumber } from "../../utils";
 import { collection, getDocs, query } from "firebase/firestore";
-import { firestore } from "../../lib/firebase";
+import { useEffect, useState } from "react";
 import { FaDollarSign } from "react-icons/fa";
+import { firestore } from "../../lib/firebase";
+import { useContract } from "../../pages/Contract/useContract";
+import { colors } from "../../styles/colors";
 
 export default function TotalIncome() {
   const { data: contractData } = useContract();
   const [total, setTotal] = useState(0);
-  const totalIncome = sumBy(
-    contractData,
-    (item) => +item.totalPrice - (+item?.discount + +item?.servicesArisingPrice)
-  );
+
   useEffect(() => {
     const handleQuery = async () => {
       const ref = query(collection(firestore, "orders"));
@@ -40,7 +34,7 @@ export default function TotalIncome() {
       </div>
       <Tooltip title={`${total} $`} trigger="click">
         <p className="whitespace-nowrap text-ellipsis text-white text-2xl lg:text-xl font-semibold overflow-hidden">
-          {total} $
+          {total.toFixed(2)} $
         </p>
       </Tooltip>
 

@@ -58,12 +58,6 @@ export default function BarChartRevenue() {
     return ordersData.filter((item) => {
       const itemYear = dayjs(item?.created).year();
       const itemMonth = dayjs(item?.created).month();
-      console.log(
-        "defaultValue",
-        itemMonth,
-        +dayjs(defaultValue).month(),
-        itemMonth === +dayjs(defaultValue).month()
-      );
       return (
         itemYear === +dayjs(defaultValue).year() &&
         itemMonth === +dayjs(defaultValue).month()
@@ -81,7 +75,11 @@ export default function BarChartRevenue() {
   //   )
   // );
   const uniqueMonths = Array.from(
-    new Set(filteredData.map((item) => dayjs(item.created).format("DD/MM")))
+    new Set(
+      filteredData.map((item) => {
+        return dayjs(item.created).format("DD/MM");
+      })
+    )
   );
   // console.log('uniqueMonths', uniqueDaysOnly)
 
@@ -100,20 +98,25 @@ export default function BarChartRevenue() {
   const datasets = filteredData.reduce((result: any, item) => {
     // const itemMonth = item.created.substring(5, 7);
 
-    const itemDay = item.created.substring(8, 10);
-    const itemMonth = item.created.substring(5, 7);
-    const dataIndex = sortedDays.indexOf(`${itemDay}/${itemMonth}`);
+    // const itemDay = dayjs(item.created).toISOString().substring(8, 10);
+    // const itemMonth = item.created.substring(5, 7);
+    const formatDay = dayjs(item.created).format("DD/MM");
+    const dataIndex = sortedDays.indexOf(formatDay);
+    // const dataIndex = sortedDays.indexOf(`${itemDay}/${itemMonth}`);
+    // console.log("tttt", dayjs(item.created).format("DD/MM"));
+    // console.log("sortedDays", sortedDays, dataIndex, `${itemDay}/${itemMonth}`);
 
     if (dataIndex !== -1) {
       if (!result[item.type]) {
         result[item.type] = Array(sortedDays.length).fill(0);
       }
-
-      result[item.type][dataIndex] += `${parseFloat(item.total)}`;
+      result[item.type][dataIndex] += parseFloat(item.total);
     }
 
     return result;
   }, {});
+
+  console.log("datasets", datasets);
 
   const options = {
     chart: {

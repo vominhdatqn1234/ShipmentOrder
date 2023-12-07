@@ -80,13 +80,13 @@ const Navbar = () => {
         size={25}
       />
       <div className="flex items-center cursor-pointer p-1 gap-3 rounded-lg">
-        <Tooltip title="Chat">
+        {/* <Tooltip title="Chat">
           <BsChatLeft color={colors.primary} size={25} />
         </Tooltip>
 
         <Tooltip title="Notification">
           <RiNotification3Line color={colors.primary} size={25} />
-        </Tooltip>
+        </Tooltip> */}
         <Avatar
           src={
             <img
@@ -102,7 +102,7 @@ const Navbar = () => {
               <span className="text-gray-900 font-bold ml-1 text-14">
                 Hi, {name}
               </span>
-              <MdKeyboardArrowDown className="text-gray-400 text-14" />
+              <MdKeyboardArrowDown className="mr-2 text-gray-400 text-14" />
             </Space>
           </a>
         </Dropdown>

@@ -23,14 +23,23 @@ import { getStorage } from "firebase/storage";
 //     appId: "1:419705901043:web:1ea4de96beced676fdcc86",
 //     measurementId: "G-Y1RS3QJ9G7"
 //   };
+// const firebaseConfig = {
+//   apiKey: "AIzaSyDpuVkE-v1ay3_-zLCl9MCkktPn_xpUQSs",
+//   authDomain: "shipmentinfomation.firebaseapp.com",
+//   projectId: "shipmentinfomation",
+//   storageBucket: "shipmentinfomation.appspot.com",
+//   messagingSenderId: "337968647992",
+//   appId: "1:337968647992:web:b01ccb9f5c19042d793bcd",
+//   measurementId: "G-BTTHG813WD"
+// };
 const firebaseConfig = {
-  apiKey: "AIzaSyDpuVkE-v1ay3_-zLCl9MCkktPn_xpUQSs",
-  authDomain: "shipmentinfomation.firebaseapp.com",
-  projectId: "shipmentinfomation",
-  storageBucket: "shipmentinfomation.appspot.com",
-  messagingSenderId: "337968647992",
-  appId: "1:337968647992:web:b01ccb9f5c19042d793bcd",
-  measurementId: "G-BTTHG813WD"
+  apiKey: "AIzaSyCScj_PXo5qzgazwseJPs47ro8BpbS0y84",
+  authDomain: "roxanatech-b4c96.firebaseapp.com",
+  projectId: "roxanatech-b4c96",
+  storageBucket: "roxanatech-b4c96.appspot.com",
+  messagingSenderId: "556483432220",
+  appId: "1:556483432220:web:049afa00131bf7a6bbf4d9",
+  measurementId: "G-XN9H65LF3W"
 };
 
 // Your web app's Firebase configuration

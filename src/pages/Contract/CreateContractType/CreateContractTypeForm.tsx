@@ -1,6 +1,15 @@
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
-import { Badge, Button, Form as FormAntDeisgn, Input, InputNumber, Select, SelectProps, message } from "antd";
+import {
+  Badge,
+  Button,
+  Form as FormAntDeisgn,
+  Input,
+  InputNumber,
+  Select,
+  SelectProps,
+  message,
+} from "antd";
 import type { FormInstance } from "antd/es/form";
 import { collection } from "firebase/firestore";
 import { isEmpty } from "lodash";
@@ -14,12 +23,11 @@ import { generateSlugUrl } from "../../../utils";
 import { useContractType } from "../ContractTypeList/useContractType";
 import { ContractType } from "../../../models/ContractModel";
 
-
 const defaultValues = {
   name: "",
 };
 
-const statusList = ["S", "M", "L", "XL",  "2XL",  "3XL",  "4XL",  "5XL",];
+const statusList = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
 
 const schema = yup
   .object({
@@ -60,7 +68,7 @@ export default function CreateContractTypeForm() {
         onFinish={handleSubmit(async (data) => {
           setLoading(true);
           const payload: ContractType = {
-            ...data
+            ...data,
           };
           mutation.mutate(payload);
           queryClient.invalidateQueries("productType");
@@ -77,11 +85,7 @@ export default function CreateContractTypeForm() {
         })}
       >
         <div className="grid grid-cols-5 gap-6">
-          <FormItem
-            control={control}
-            name="name"
-            label="Tên loại sản phẩm"
-          >
+          <FormItem control={control} name="name" label="Tên loại sản phẩm">
             <Input allowClear placeholder="Nhập tên loại sản phẩm" />
           </FormItem>
           <FormItem control={control} name="size" label="Size">
@@ -89,6 +93,7 @@ export default function CreateContractTypeForm() {
               {statusList.map((sts, index) => {
                 return (
                   <Select.Option key={index} value={sts}>
+                    {sts}
                   </Select.Option>
                 );
               })}

@@ -16,6 +16,7 @@ import {
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { firestore } from "../../../lib/firebase";
 import { toast } from "react-toastify";
+import { lowerCase } from "lodash";
 
 let index = 0;
 const currentYear = dayjs();
@@ -90,7 +91,7 @@ export default function BarChartRevenue() {
         result[item.type] = Array(sortedMonths.length).fill(0);
       }
 
-      result[item.type][dataIndex] += `${parseFloat(item.total)}`;
+      result[item.type][dataIndex] += parseFloat(item.total);
     }
 
     return result;
@@ -160,6 +161,7 @@ export default function BarChartRevenue() {
       const querySnapshot = await getDocs(ref);
       let data: any = [];
       querySnapshot.forEach((doc) => {
+        console.log("data", data);
         data.push({ id: doc.id, ...doc.data() });
       });
       setOrdersData(data);

@@ -16,7 +16,15 @@ import {
 import type { FormInstance } from "antd/es/form";
 import dayjs, { Dayjs } from "dayjs";
 import { collection } from "firebase/firestore";
-import { find, isEmpty, isNull, lowerCase, map, startsWith } from "lodash";
+import {
+  find,
+  isEmpty,
+  isNull,
+  lowerCase,
+  map,
+  some,
+  startsWith,
+} from "lodash";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "react-query";
@@ -41,7 +49,7 @@ import { useUser } from "../../../store/useUser";
 import { isVietnamesePhoneNumber } from "../../../utils";
 import { useContractType } from "../../Contract/ContractTypeList/useContractType";
 import { useOrders } from "../useOrders";
-import customParseFormat from 'dayjs/plugin/customParseFormat'
+import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 
 const { Dragger } = Upload;
@@ -175,19 +183,26 @@ export default function CreateOrderForm() {
           name: lowerCase(item?.name),
         }));
 
-        const array = [{
-          type: 'Shirt-T',
-          name: 'Shirt-T',
-        }, {
-          type: 'Hoodie',
-          name: 'Hoodie',
-        }, 
+        const array = [
           {
-            type: 'Sweatshirt',
-            name: 'Sweatshirt',
-        }]
+            type: "Shirt-T",
+            name: "Shirt-T",
+          },
+          {
+            type: "Hoodie",
+            name: "Hoodie",
+          },
+          {
+            type: "Sweatshirt",
+            name: "Sweatshirt",
+          },
+        ];
         const mapFileExcel = map(data, (item) => {
-          const itemType = lowerCase(item["Type"]).includes('sweatshirt') ? 'Sweatshirt' : item["Type"].toLowerCase().includes('shirt') ? 'T-Shirt' : item["Type"];
+          const itemType = lowerCase(item["Type"]).includes("sweatshirt")
+            ? "Sweatshirt"
+            : item["Type"].toLowerCase().includes("shirt")
+            ? "T-Shirt"
+            : item["Type"];
           const isExistItem = find(mapProductType as any, {
             name: lowerCase(itemType),
             size: item["Size"],
@@ -216,9 +231,16 @@ export default function CreateOrderForm() {
             return match ? match[1] : null;
           }
 
-          const designPrice = !isEmpty(getDirectImageLink(item["Design Front"] || "")) && !isEmpty(getDirectImageLink(item["Design Back"] || "")) ? isExistItem?.priceTwoSides : isExistItem?.priceOneSide
-          const format = 'DD/MM/YYYY';
-          const typeCreated = typeof item["Date"] === 'number' ? getJsDateFromExcel?.(item["Date"]) : dayjs(item["Date"], format)
+          const designPrice =
+            !isEmpty(getDirectImageLink(item["Design Front"] || "")) &&
+            !isEmpty(getDirectImageLink(item["Design Back"] || ""))
+              ? isExistItem?.priceTwoSides
+              : isExistItem?.priceOneSide;
+          const format = "DD/MM/YYYY";
+          const typeCreated =
+            typeof item["Date"] === "number"
+              ? getJsDateFromExcel?.(item["Date"])
+              : dayjs(item["Date"], format);
 
           return {
             created: dayjs(typeCreated).toISOString(),
@@ -492,15 +514,17 @@ export default function CreateOrderForm() {
           <div className="flex flex-col gap-2 items-center">
             <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
               {!isEmpty(text) ? (
-                 <Image
-                 src={text}
-                 width={40}
-                 height={40}
-                 preview={{
-                   mask: <AiOutlineEye />,
-                 }}
-               />
-              ) : '--'}
+                <Image
+                  src={text}
+                  width={40}
+                  height={40}
+                  preview={{
+                    mask: <AiOutlineEye />,
+                  }}
+                />
+              ) : (
+                "--"
+              )}
             </div>
           </div>
         );
@@ -514,16 +538,18 @@ export default function CreateOrderForm() {
         return (
           <div className="flex flex-col items-center">
             <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
-            {!isEmpty(text) ? (
-                 <Image
-                 src={text}
-                 width={40}
-                 height={40}
-                 preview={{
-                   mask: <AiOutlineEye />,
-                 }}
-               />
-              ) : '--'}
+              {!isEmpty(text) ? (
+                <Image
+                  src={text}
+                  width={40}
+                  height={40}
+                  preview={{
+                    mask: <AiOutlineEye />,
+                  }}
+                />
+              ) : (
+                "--"
+              )}
             </div>
           </div>
         );
@@ -537,16 +563,18 @@ export default function CreateOrderForm() {
         return (
           <div className="flex flex-col items-center">
             <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
-            {!isEmpty(text) ? (
-                 <Image
-                 src={text}
-                 width={40}
-                 height={40}
-                 preview={{
-                   mask: <AiOutlineEye />,
-                 }}
-               />
-              ) : '--'}
+              {!isEmpty(text) ? (
+                <Image
+                  src={text}
+                  width={40}
+                  height={40}
+                  preview={{
+                    mask: <AiOutlineEye />,
+                  }}
+                />
+              ) : (
+                "--"
+              )}
             </div>
           </div>
         );
@@ -557,7 +585,16 @@ export default function CreateOrderForm() {
       dataIndex: "quantity",
       key: "quantity",
     },
-
+    {
+      title: "Price",
+      dataIndex: "price",
+      key: "price",
+      sorter: (a, b) => a.price.localeCompare(b.price),
+      sortDirections: ["descend", "ascend"],
+      render: (text: string) => {
+        return <p>{text} $</p>;
+      },
+    },
     {
       title: "Total",
       dataIndex: "total",
@@ -588,7 +625,9 @@ export default function CreateOrderForm() {
       key: "tracking",
     },
   ];
-
+  function hasNaNTotal(arr: any = []) {
+    return some(arr, (obj) => obj.total === "NaN");
+  }
   return (
     <>
       {contextHolder}
@@ -747,9 +786,15 @@ export default function CreateOrderForm() {
             <Editor />
           </FormItem>
         </div> */}
+        {hasNaNTotal(fileExcelData) ? (
+          <span className="pb-6 text-base text-red-700">
+            File upload có giá trị total không thoả điều kiện nên không được tạo
+          </span>
+        ) : null}
+
         <Button
           loading={loading}
-          disabled={fileExcelData.length <= 0}
+          disabled={fileExcelData.length <= 0 || hasNaNTotal(fileExcelData)}
           type="primary"
           htmlType="submit"
           block

@@ -1,13 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
-import Chart from "react-apexcharts";
-import { colors } from "../../styles/colors";
 import { Divider, Select, SelectProps } from "antd";
 import dayjs from "dayjs";
-import { useContract } from "../../pages/Contract/useContract";
-import { findIndex, groupBy, keys, map, sumBy } from "lodash";
-import { formatCurrency } from "../../utils";
 import { collection, getDocs, query } from "firebase/firestore";
+import { findIndex, groupBy, keys, map, sumBy } from "lodash";
+import { useEffect, useState } from "react";
+import Chart from "react-apexcharts";
 import { firestore } from "../../lib/firebase";
+import { colors } from "../../styles/colors";
 
 export default function TotalSales() {
   const currentYear = `${dayjs().year()}`;
@@ -83,7 +81,7 @@ export default function TotalSales() {
       fillSeriesColor: false,
       y: {
         formatter: function (val: any) {
-          return `${val} $`;
+          return `${val?.toFixed?.(2)} $`;
         },
       },
     },
@@ -104,11 +102,9 @@ export default function TotalSales() {
       <div className="flex justify-between items-center px-6">
         <p className="text-base text-[rgb(119,126,137)]">Doanh thu hàng năm</p>
         <h2 className="text-xl font-bold leading-3">
-          {
-            +seriesTotalSales?.[
-              findIndex(labels, (e) => e === defaultYear)
-            ] as any
-          }{" "}
+          {+seriesTotalSales?.[
+            findIndex(labels, (e) => e === defaultYear)
+          ]?.toFixed?.(2) || ("0.00" as any)}
           $
         </h2>
       </div>

@@ -16,8 +16,8 @@ import type {
   ColumnsType,
   FilterConfirmProps,
 } from "antd/es/table/interface";
-import { collection, deleteDoc, doc } from "firebase/firestore";
-import { useRef, useState } from "react";
+import { collection, deleteDoc, doc, getDocs, query } from "firebase/firestore";
+import { useEffect, useRef, useState } from "react";
 import Highlighter from "react-highlight-words";
 import { FaEdit } from "react-icons/fa";
 import { MdDeleteForever } from "react-icons/md";
@@ -31,6 +31,8 @@ import { ContractType } from "../../../models/ContractModel";
 import { formatCurrency } from "../../../utils";
 import EditContractType from "../EditContractType";
 import { ProductType } from "../../../models/ProductTypeModel";
+import { useProductTypeSlice } from "../../../store/useProductType";
+import { produce } from "immer";
 // import EditWeddingDressType from "../EditWeddingDressType";
 // import { useWeddingDressType } from "./useWeddingDressType";
 
@@ -40,11 +42,13 @@ const ContractTypeList = () => {
   const [searchText, setSearchText] = useState("");
   const [searchedColumn, setSearchedColumn] = useState("");
   const searchInput = useRef<InputRef>(null);
-  const queryClient = useQueryClient();
-  const { data: contractTypeData, isLoading, refetch } = useContractType();
-  console.log('data', contractTypeData)
-  const collectionRef = collection(firestore, "contractType");
+  // const { data: productTypeData, isLoading, refetch } = useContractType();
+  const { setProductsType, productsType: productTypeData } =
+    useProductTypeSlice();
+
+  const collectionRef = collection(firestore, "productType");
   const [opened, setOpened] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [defaultValues, setDefaultValues] = useState<ProductType>({
     name: "",
     priceOneSide: "",
@@ -76,9 +80,12 @@ const ContractTypeList = () => {
   const handleDelete = (record: any) => async () => {
     const docRef = doc(collectionRef, record?.id);
     await deleteDoc(docRef);
-    queryClient.invalidateQueries("contractType");
-    setTimeout(async () => await refetch(), 300);
-  }
+    const deletedProductTypesArray = produce(productTypeData, (draft) => {
+      const index = draft.findIndex((todo) => todo.id === record?.id);
+      if (index !== -1) draft.splice(index, 1);
+    });
+    setProductsType(deletedProductTypesArray);
+  };
 
   const handleEditContractType = (record: ProductType) => () => {
     setDefaultValues({
@@ -86,6 +93,25 @@ const ContractTypeList = () => {
     });
     setOpened(true);
   };
+
+  useEffect(() => {
+    const handleQuery = async () => {
+      try {
+        const ref = query(collection(firestore, "productType"));
+        const querySnapshot = await getDocs(ref);
+        let data: any = [];
+        querySnapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() });
+        });
+        setProductsType(data);
+      } catch (error) {
+        console.log("error fetch product type", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    handleQuery();
+  }, []);
 
   const getColumnSearchProps = (
     dataIndex: DataIndex,
@@ -157,7 +183,7 @@ const ContractTypeList = () => {
       <SearchOutlined style={{ color: filtered ? "#1677ff" : undefined }} />
     ),
     onFilter: (value: any, record: ProductType) =>
-     `${record?.[dataIndex] || ''}`
+      `${record?.[dataIndex] || ""}`
         .toString()
         .toLowerCase()
         .includes((value as string).toLowerCase()),
@@ -191,7 +217,7 @@ const ContractTypeList = () => {
       key: "name",
       sorter: (a, b) => a.name.localeCompare(b.name),
       sortDirections: ["descend", "ascend"],
-      ...getColumnSearchProps('name')
+      ...getColumnSearchProps("name"),
     },
     {
       title: "Size",
@@ -248,8 +274,8 @@ const ContractTypeList = () => {
           </Tooltip>
           <Tooltip title="Xoá">
             <Popconfirm
-              title="Xóa loại hợp đồng"
-              description="Bạn có chắc là muốn xóa loại hợp đồng?"
+              title="Xóa loại sản phẩm"
+              description="Bạn có chắc là muốn xóa loại sản phẩm?"
               icon={<QuestionCircleOutlined style={{ color: colors.red2 }} />}
               onConfirm={handleDelete(record)}
             >
@@ -285,7 +311,7 @@ const ContractTypeList = () => {
               title: "Trang chủ",
             },
             {
-              title: "Danh sách váy cưới",
+              title: "Danh sách loại sản phẩm",
             },
           ]}
         />
@@ -294,12 +320,12 @@ const ContractTypeList = () => {
       <Table
         rowKey={(record) => record.id}
         columns={columns as any}
-        dataSource={contractTypeData}
+        dataSource={productTypeData}
         bordered
         scroll={{ x: 800 }}
       />
       <Modal
-        title="Cập nhật loại hợp đồng"
+        title="Cập nhật loại sản phẩm"
         open={opened}
         footer={null}
         onCancel={handleCancel}
@@ -308,7 +334,7 @@ const ContractTypeList = () => {
         <EditContractType
           defaultValues={defaultValues as any}
           handleCancel={handleCancel}
-          refetch={refetch}
+          refetch={() => {}}
         />
       </Modal>
     </div>

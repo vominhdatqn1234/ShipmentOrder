@@ -95,30 +95,45 @@ const DrawerMenu: ForwardRefRenderFunction<DrawerMenuRef, DrawerProps> = (
           "Dashboard",
           "dashboard",
           null,
-          [getItem("Thống kê daonh thu", "ecommerce", <FcSalesPerformance />)],
+          [getItem("Thống kê doanh thu", "ecommerce", <FcSalesPerformance />)],
           "group"
         )
       : null;
 
   const employeesItem = isAdmin
     ? getItem("Employees", "employees", <HiUser />, [
-      getItem("Danh sách đơn hàng", "contract-list", <FaRegListAlt />),
-      getItem("Tạo đơn hàng", "create-contract", <MdOutlinePlaylistAdd />),
+        getItem("Danh sách nhân viên", "employees-list", <HiUserGroup />),
+        getItem("Tạo nhân viên", "create-employees", <HiUserPlus />),
       ])
     : null;
 
   const contractItem =
     // isAdmin || isManager
-    //   ? 
-      getItem("Orders", "contract", <FaFileContract />, [
-          getItem("Order List", "contract-list", <FaRegListAlt />),
-          // getItem("Create Order", "create-contract", <MdOutlinePlaylistAdd />),
-          // isAdmin ? getItem("Danh sách loại hợp đồng", "contract-type-list", <FaRegListAlt />) : null,
-          // isAdmin ? getItem("Tạo loại hợp đồng", "create-contract-type", <MdOutlinePlaylistAdd />) : null,
-          // isAdmin ? getItem("Danh sách danh mục phát", "services-arising-list", <FaRegListAlt />) : null,
-          // isAdmin ? getItem("Tạo danh mục phát", "create-services-arising", <MdOutlinePlaylistAdd />) : null,
-        ])
-      // : null;
+    //   ?
+    getItem("Orders", "contract", <FaFileContract />, [
+      getItem("Danh sách đơn hàng", "contract-list", <FaRegListAlt />),
+      getItem("Tạo đơn hàng", "create-contract", <MdOutlinePlaylistAdd />),
+      isAdmin
+        ? getItem(
+            "Danh sách loại sản phẩm",
+            "contract-type-list",
+            <FaRegListAlt />
+          )
+        : null,
+      isAdmin
+        ? getItem(
+            "Tạo loại sản phẩm",
+            "create-contract-type",
+            <MdOutlinePlaylistAdd />
+          )
+        : null,
+      // getItem("Create Order", "create-contract", <MdOutlinePlaylistAdd />),
+      // isAdmin ? getItem("Danh sách loại hợp đồng", "contract-type-list", <FaRegListAlt />) : null,
+      // isAdmin ? getItem("Tạo loại hợp đồng", "create-contract-type", <MdOutlinePlaylistAdd />) : null,
+      // isAdmin ? getItem("Danh sách danh mục phát", "services-arising-list", <FaRegListAlt />) : null,
+      // isAdmin ? getItem("Tạo danh mục phát", "create-services-arising", <MdOutlinePlaylistAdd />) : null,
+    ]);
+  // : null;
 
   const items: MenuItem[] = [
     // getItem(
@@ -271,12 +286,12 @@ const DrawerMenu: ForwardRefRenderFunction<DrawerMenuRef, DrawerProps> = (
         onClose={onClose}
         open={open}
       >
-         <Link
-        to="/"
-        className="items-center justify-center gap-3 ml-3 flex text-xl font-extrabold tracking-tight text-slate-900"
-      >
-       Teement
-      </Link>
+        <Link
+          to="/"
+          className="items-center justify-center gap-3 ml-3 flex text-xl font-extrabold tracking-tight text-slate-900"
+        >
+          Teement
+        </Link>
         <Menu
           onClick={onClick}
           mode="inline"

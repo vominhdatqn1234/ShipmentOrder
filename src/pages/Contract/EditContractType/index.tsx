@@ -4,6 +4,7 @@ import {
   Form as FormAntDeisgn,
   Input,
   InputNumber,
+  Select,
   message,
 } from "antd";
 import type { FormInstance } from "antd/es/form";
@@ -19,20 +20,25 @@ import { WeddingDressModel } from "../../../models";
 import { WeddingDressTypeModel } from "../../../models/WeddingDressModel";
 import { generateSlugUrl } from "../../../utils";
 import { ContractType } from "../../../models/ContractModel";
+import { ProductType } from "../../../models/ProductTypeModel";
+import { produce } from "immer";
+import { useProductTypeSlice } from "../../../store/useProductType";
 
 const schema = yup
   .object({
-    contractName: yup.string().required("Vui lòng nhập tên tên loại hợp đồng"),
-    contractPrice: yup.string().required("Vui lòng nhập giá của loại hợp đồng"),
+    // contractName: yup.string().required("Vui lòng nhập tên tên loại hợp đồng"),
+    // contractPrice: yup.string().required("Vui lòng nhập giá của loại hợp đồng"),
   })
   .required();
+
+const statusList = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
 
 export default function EditContractType({
   defaultValues,
   handleCancel,
   refetch,
 }: {
-  defaultValues: ContractType;
+  defaultValues: ProductType;
   handleCancel: () => void;
   refetch: () => void;
 }) {
@@ -40,8 +46,10 @@ export default function EditContractType({
   const [form] = FormAntDeisgn.useForm();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
-  const contractRef = collection(firestore, "contractType");
+  const contractRef = collection(firestore, "productType");
   const queryClient = useQueryClient();
+  const { setProductsType, productsType: productTypeData } =
+    useProductTypeSlice();
 
   const {
     control,
@@ -59,9 +67,11 @@ export default function EditContractType({
   useEffect(() => {
     form.setFieldsValue({
       id: defaultValues?.id,
-      contractName: defaultValues.contractName,
-      contractPrice: defaultValues.contractPrice,
-      contractType: defaultValues.contractType,
+      name: defaultValues.name,
+      priceOneSide: defaultValues.priceOneSide,
+      priceTwoSides: defaultValues.priceTwoSides,
+      shipPrice: defaultValues.shipPrice,
+      size: defaultValues.size,
     });
   }, [defaultValues, form]);
 
@@ -74,20 +84,26 @@ export default function EditContractType({
         ref={formRef}
         layout="vertical"
         initialValues={defaultValues}
-        onFinish={handleSubmit(async (data: ContractType) => {
+        onFinish={handleSubmit(async (data: ProductType) => {
           setLoading(true);
-          const payload: ContractType = {
+          const payload: ProductType = {
             ...data,
-            contractType: generateSlugUrl(data?.contractName),
           };
-          console.log("payload", payload);
-          const docRef = doc(contractRef, defaultValues.id);
+          const docRef = doc(contractRef, defaultValues?.id);
           await updateDoc(docRef, payload);
-          queryClient.invalidateQueries("contractType");
-          setTimeout(async () => await refetch(), 300);
+          const updatedProductsTypeArray = produce(productTypeData, (draft) => {
+            const index = draft.findIndex(
+              (todo) => todo.id === defaultValues?.id
+            );
+            if (index !== -1) {
+              draft[index] = data;
+            }
+          });
+          setProductsType(updatedProductsTypeArray);
+
           messageApi.open({
             type: "success",
-            content: "Cập nhập loại hợp đồng thành công!",
+            content: "Cập nhập thành công!",
             duration: 5,
           });
           setLoading(false);
@@ -97,22 +113,43 @@ export default function EditContractType({
           reset();
         })}
       >
-        <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
-          <FormItem
-            control={control}
-            name="contractName"
-            label="Tên loại hợp đồng"
-          >
-            <Input allowClear placeholder="Nhập tên loại hợp đồng" />
+        <div className="grid grid-cols-2 gap-6">
+          <FormItem control={control} name="name" label="Tên loại sản phẩm">
+            <Input allowClear placeholder="Nhập tên loại sản phẩm" />
           </FormItem>
-          <FormItem
-            control={control}
-            name="contractPrice"
-            label="Giá của loại hợp đồng"
-          >
+          <FormItem control={control} name="size" label="Size">
+            <Select showSearch>
+              {statusList.map((sts, index) => {
+                return (
+                  <Select.Option key={index} value={sts}>
+                    {sts}
+                  </Select.Option>
+                );
+              })}
+            </Select>
+          </FormItem>
+          <FormItem control={control} name="priceOneSide" label="Giá 1 mặt">
             <InputNumber
               style={{ width: "100%" }}
-              placeholder="Nhập giá hợp đồng"
+              placeholder="Nhập giá của 1 mặt"
+              formatter={(value) =>
+                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+              }
+            />
+          </FormItem>
+          <FormItem control={control} name="priceTwoSides" label="Giá 2 mặt">
+            <InputNumber
+              style={{ width: "100%" }}
+              placeholder="Nhập giá của 2 mặt"
+              formatter={(value) =>
+                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+              }
+            />
+          </FormItem>
+          <FormItem control={control} name="shipPrice" label="Giá ship">
+            <InputNumber
+              style={{ width: "100%" }}
+              placeholder="Nhập giá ship"
               formatter={(value) =>
                 `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
               }

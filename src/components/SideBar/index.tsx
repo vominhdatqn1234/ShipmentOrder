@@ -56,7 +56,7 @@ const SideBar: React.FC = () => {
         "Dashboard",
         "dashboard",
         null,
-        [getItem("Thống kê daonh thu", "ecommerce", <FcSalesPerformance />)],
+        [getItem("Thống kê doanh thu", "ecommerce", <FcSalesPerformance />)],
         "group"
       )
     : null;
@@ -67,48 +67,45 @@ const SideBar: React.FC = () => {
       ])
     : null;
 
-  const contractItem =
-      getItem("Orders", "contract", <FaFileContract />, [
-          getItem("Danh sách đơn hàng", "contract-list", <FaRegListAlt />),
-          getItem("Tạo đơn hàng", "create-contract", <MdOutlinePlaylistAdd />),
-          isAdmin
-            ? getItem(
-                "Danh sách loại sản phẩm",
-                "contract-type-list",
-                <FaRegListAlt />
-              )
-            : null,
-          isAdmin
-            ? getItem(
-                "Tạo loại sản phẩm",
-                "create-contract-type",
-                <MdOutlinePlaylistAdd />
-              )
-            : null,
-          // isAdmin
-          //   ? getItem(
-          //       "Danh sách danh mục phát",
-          //       "services-arising-list",
-          //       <FaRegListAlt />
-          //     )
-          //   : null,
-          // isAdmin
-          //   ? getItem(
-          //       "Tạo danh mục phát",
-          //       "create-services-arising",
-          //       <MdOutlinePlaylistAdd />
-          //     )
-          //   : null,
-        ])
-      ;
-
+  const contractItem = getItem("Orders", "contract", <FaFileContract />, [
+    getItem("Danh sách đơn hàng", "contract-list", <FaRegListAlt />),
+    getItem("Tạo đơn hàng", "create-contract", <MdOutlinePlaylistAdd />),
+    isAdmin
+      ? getItem(
+          "Danh sách loại sản phẩm",
+          "contract-type-list",
+          <FaRegListAlt />
+        )
+      : null,
+    isAdmin
+      ? getItem(
+          "Tạo loại sản phẩm",
+          "create-contract-type",
+          <MdOutlinePlaylistAdd />
+        )
+      : null,
+    // isAdmin
+    //   ? getItem(
+    //       "Danh sách danh mục phát",
+    //       "services-arising-list",
+    //       <FaRegListAlt />
+    //     )
+    //   : null,
+    // isAdmin
+    //   ? getItem(
+    //       "Tạo danh mục phát",
+    //       "create-services-arising",
+    //       <MdOutlinePlaylistAdd />
+    //     )
+    //   : null,
+  ]);
   const items: MenuItem[] = [
     getItem(
       <Link
         to="/"
         className="items-center justify-center gap-3 ml-3 flex text-xl font-extrabold tracking-tight text-slate-900"
       >
-       Teement
+        Teement
       </Link>,
       "home",
       null

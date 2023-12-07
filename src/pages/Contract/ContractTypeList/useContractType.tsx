@@ -8,9 +8,10 @@ export function useContractType() {
   const ref = query(
     collection(firestore, "productType"),
     orderBy("name", "desc")
+    // orderBy("size", "desc")
   );
   // Provide the query to the hook
-  const queryContractType = useFirestoreQuery(["productTypeKey"], ref);
+  const queryContractType = useFirestoreQuery(["productType"], ref);
   const snapshot = queryContractType.data;
   let data: any[] = [];
   snapshot?.forEach((docSnapshot) => {

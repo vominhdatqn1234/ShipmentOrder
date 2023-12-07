@@ -21,7 +21,6 @@ export function useOrders() {
   snapshot?.forEach((docSnapshot) => {
     data.push({ id: docSnapshot.id, ...docSnapshot.data() });
   });
-  console.log('data',data)
 
   const refetchContract = async () => {
     try {

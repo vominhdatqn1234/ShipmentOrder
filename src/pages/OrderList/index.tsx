@@ -54,8 +54,8 @@ const OrderList = () => {
   const searchInput = useRef<InputRef>(null);
   const queryClient = useQueryClient();
   const { data: contractData, isLoading, refetch } = useOrders();
-  useOrdersHook()
-  const { orders: orderData } = useOrderSlice()
+  useOrdersHook();
+  const { orders: orderData } = useOrderSlice();
 
   const collectionRef = collection(firestore, "orders");
   const [opened, setOpened] = useState(false);
@@ -273,16 +273,16 @@ const OrderList = () => {
       dataIndex: "quantity",
       key: "quantity",
     },
-    // {
-    //   title: "Price",
-    //   dataIndex: "price",
-    //   key: "price",
-    //   sorter: (a, b) => a.price.localeCompare(b.price),
-    //   sortDirections: ["descend", "ascend"],
-    //   render: (text: string) => {
-    //     return <p>{formatCurrency(text)}</p>;
-    //   },
-    // },
+    {
+      title: "Price",
+      dataIndex: "price",
+      key: "price",
+      sorter: (a, b) => a.price.localeCompare(b.price),
+      sortDirections: ["descend", "ascend"],
+      render: (text: string) => {
+        return <p>{text} $</p>;
+      },
+    },
     {
       title: "Total",
       dataIndex: "total",
@@ -314,9 +314,9 @@ const OrderList = () => {
       title: "Tracking",
       dataIndex: "tracking",
       key: "tracking",
-          render: (text: string) => {
-        return <p>{text || '--'}</p>
-      }
+      render: (text: string) => {
+        return <p>{text || "--"}</p>;
+      },
     },
   ];
 
@@ -382,7 +382,7 @@ const OrderList = () => {
           items={[
             {
               href: "/",
-              title: "Home",
+              title: "Trang chủ",
             },
             {
               title: "Danh sách hóa đơn",
@@ -390,7 +390,7 @@ const OrderList = () => {
           ]}
         />
       </div>
-        
+
       <Table
         rowKey={(record) => `${uuid()}-${record.id}`}
         columns={columns}
