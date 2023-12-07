@@ -74,7 +74,8 @@ const OrderList = () => {
     size: "",
     userId: user?.id || "",
     type: "",
-    tracking: '',
+    tracking: "",
+    color: "",
   });
 
   const handleSearch = (
@@ -261,6 +262,11 @@ const OrderList = () => {
       title: "Size",
       dataIndex: "size",
       key: "size",
+    },
+    {
+      title: "Color",
+      dataIndex: "color",
+      key: "color",
     },
     {
       title: "Quantity",
