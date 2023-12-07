@@ -95,15 +95,15 @@ const DrawerMenu: ForwardRefRenderFunction<DrawerMenuRef, DrawerProps> = (
           "Dashboard",
           "dashboard",
           null,
-          [getItem("Ecommerce", "ecommerce", <FcSalesPerformance />)],
+          [getItem("Thống kê daonh thu", "ecommerce", <FcSalesPerformance />)],
           "group"
         )
       : null;
 
   const employeesItem = isAdmin
     ? getItem("Employees", "employees", <HiUser />, [
-        getItem("Employee List", "employees-list", <HiUserGroup />),
-        getItem("Create Employee", "create-employees", <HiUserPlus />),
+      getItem("Danh sách đơn hàng", "contract-list", <FaRegListAlt />),
+      getItem("Tạo đơn hàng", "create-contract", <MdOutlinePlaylistAdd />),
       ])
     : null;
 
@@ -271,12 +271,12 @@ const DrawerMenu: ForwardRefRenderFunction<DrawerMenuRef, DrawerProps> = (
         onClose={onClose}
         open={open}
       >
-        <Link to="/" className="grid place-items-center">
-          <img
-            src="/output-onlinepngtools-1.png"
-            className="object-cover w-[140px] h-[80px]"
-          />
-        </Link>
+         <Link
+        to="/"
+        className="items-center justify-center gap-3 ml-3 flex text-xl font-extrabold tracking-tight text-slate-900"
+      >
+       Teement
+      </Link>
         <Menu
           onClick={onClick}
           mode="inline"
