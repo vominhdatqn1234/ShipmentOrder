@@ -226,6 +226,7 @@ export default function CreateOrderForm() {
             city: item["City"] || "",
             imageFront: getDirectImageLink(item["Design Front"] || ""),
             imageBack: getDirectImageLink(item["Design Back"] || ""),
+            mockup: getDirectImageLink(item["Mockup"] || ""),
             name: `${item["First name"]} ${item["Last name"]}`,
             partnerOrderId: item["Order ID"] || "",
             quantity,
@@ -510,7 +511,29 @@ export default function CreateOrderForm() {
       dataIndex: "imageBack",
       key: "imageBack",
       render: (text, record) => {
-        console.log("text", text);
+        return (
+          <div className="flex flex-col items-center">
+            <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
+            {!isEmpty(text) ? (
+                 <Image
+                 src={text}
+                 width={40}
+                 height={40}
+                 preview={{
+                   mask: <AiOutlineEye />,
+                 }}
+               />
+              ) : '--'}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: "Mockup",
+      dataIndex: "mockup",
+      key: "mockup",
+      render: (text, record) => {
         return (
           <div className="flex flex-col items-center">
             <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
