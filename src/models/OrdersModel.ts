@@ -19,4 +19,5 @@ export type OrdersModel = {
   type: string;
   userId: string;
   tracking: string;
+  color: string;
 };
