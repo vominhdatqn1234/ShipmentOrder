@@ -13,7 +13,7 @@ const CreateOrder = () => {
 							title: 'Home',
 						},
 						{
-							title: 'Create Order',
+							title: 'Tạo hóa đơn',
 						},
 					]}
 				/>
