@@ -208,7 +208,7 @@ export default function CreateOrderForm() {
           const typeCreated = typeof item["Date"] === 'number' ? getJsDateFromExcel?.(item["Date"]) : dayjs(item["Date"], format)
 
           return {
-            created: dayjs(typeCreated).toISOString(),
+            created: dayjs(typeCreated)?.toISOString(),
             address: item["Address line 1"] || "",
             city: item["City"] || "",
             imageFront: getDirectImageLink(item["Design Front"] || ""),
