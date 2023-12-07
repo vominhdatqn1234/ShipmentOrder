@@ -214,6 +214,7 @@ export default function CreateOrderForm() {
             size: item["Size"] || "",
             tracking: item["Tracking"] || "",
             phone: item["Phone"] || "",
+            color: item["Color"] || "",
             price: `${isExistItem?.priceOneSide}`,
             shipPrice: `${isExistItem?.shipPrice}`,
             total: `${parseFloat(
@@ -456,6 +457,11 @@ export default function CreateOrderForm() {
       title: "Size",
       dataIndex: "size",
       key: "size",
+    },
+    {
+      title: "Color",
+      dataIndex: "color",
+      key: "color",
     },
     {
       title: "Design Front",
