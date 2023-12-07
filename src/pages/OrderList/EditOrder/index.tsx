@@ -276,6 +276,13 @@ export default function EditOrder({
           </FormItem>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
+        <FormItem
+            control={control}
+            name="color"
+            label="Color"
+          >
+            <Input allowClear placeholder="Nhập color" />
+          </FormItem>
           <FormItem
             control={control}
             name="tracking"
