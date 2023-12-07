@@ -16,7 +16,7 @@ import {
 import type { FormInstance } from "antd/es/form";
 import dayjs, { Dayjs } from "dayjs";
 import { collection } from "firebase/firestore";
-import { find, isEmpty, isNull, lowerCase, map } from "lodash";
+import { find, isEmpty, isNull, lowerCase, map, startsWith } from "lodash";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "react-query";
@@ -175,11 +175,24 @@ export default function CreateOrderForm() {
           name: lowerCase(item?.name),
         }));
 
+        const array = [{
+          type: 'Shirt-T',
+          name: 'Shirt-T',
+        }, {
+          type: 'Hoodie',
+          name: 'Hoodie',
+        }, 
+          {
+            type: 'Sweatshirt',
+            name: 'Sweatshirt',
+        }]
         const mapFileExcel = map(data, (item) => {
+          const itemType = lowerCase(item["Type"]).includes('sweatshirt') ? 'Sweatshirt' : item["Type"].toLowerCase().includes('shirt') ? 'T-Shirt' : item["Type"];
           const isExistItem = find(mapProductType as any, {
-            name: lowerCase(item["Type"]),
+            name: lowerCase(itemType),
             size: item["Size"],
           });
+
           const quantity = !isNull(item["Quantity"])
             ? `${item["Quantity"]}`
             : "1";
