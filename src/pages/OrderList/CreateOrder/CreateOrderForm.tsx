@@ -41,6 +41,8 @@ import { useUser } from "../../../store/useUser";
 import { isVietnamesePhoneNumber } from "../../../utils";
 import { useContractType } from "../../Contract/ContractTypeList/useContractType";
 import { useOrders } from "../useOrders";
+import customParseFormat from 'dayjs/plugin/customParseFormat'
+dayjs.extend(customParseFormat);
 
 const { Dragger } = Upload;
 
@@ -202,9 +204,11 @@ export default function CreateOrderForm() {
           }
 
           const designPrice = !isEmpty(getDirectImageLink(item["Design Front"] || "")) && !isEmpty(getDirectImageLink(item["Design Back"] || "")) ? isExistItem?.priceTwoSides : isExistItem?.priceOneSide
-          console.log('designPrice', designPrice)
+          const format = 'DD/MM/YYYY';
+          const typeCreated = typeof item["Date"] === 'number' ? getJsDateFromExcel?.(item["Date"]) : dayjs(item["Date"], format)
+
           return {
-            created: dayjs(getJsDateFromExcel(item["Date"])).toISOString(),
+            created: dayjs(typeCreated).toISOString(),
             address: item["Address line 1"] || "",
             city: item["City"] || "",
             imageFront: getDirectImageLink(item["Design Front"] || ""),
