@@ -12,6 +12,7 @@ import { useUser } from "../../store/useUser";
 import BarChartArising from "../../components/Chart/BarChartArising";
 import BarChartRevenue from "../../components/Chart/BarChartRevenue";
 import BarchartDiscount from "../../components/Chart/BarChartDiscount";
+import BarChartClient from "../../components/Chart/BarChartClient";
 
 export default function Home() {
   const { user } = useUser();
@@ -20,7 +21,7 @@ export default function Home() {
     return (
       <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="analytics-report-container">
+          {/* <div className="analytics-report-container">
             <div className="analytics-report bg-white rounded-3xl drop-shadow-lg p-[14px]">
               <p className="text-lg font-semibold leading-4 text-gray-900">
                 Hey {user?.name}
@@ -30,34 +31,34 @@ export default function Home() {
             <div className="grid grid-cols-1 mt-4 gap-6">
               <TotalIncome />
             </div>
-          </div>
-          <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
+          </div> */}
+          {/* <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
             <TotalSales />
-          </div>
+          </div> */}
         </div>
         <div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
-            <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
-              <BarChartRevenue />
+          {isAdmin ? (
+            <div className="py-6">
+              {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> */}
+              <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
+                <BarChart />
+                {/* </div> */}
+              </div>
             </div>
-            <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
-              <BarChart />
-            </div>
-            {/* <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
-              <BarChartArising />
-            </div>
-            <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
-              <BarchartDiscount />
-            </div> */}
-          </div>
+          ) : null}
+          {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6"> */}
+          {!isAdmin ? (
+            <>
+              <div className="py-6">
+                <div className="bg-white rounded-3xl drop-shadow-lg px-4 flex flex-col justify-center">
+                  <BarChartClient />
+                </div>
+              </div>
+            </>
+          ) : null}
         </div>
-        {/* <div className="grid grid-cols-2 gap-3 h-[100px] mt-6">
-        <div className="bg-white rounded-3xl drop-shadow-lg px-4 ">
-            <BarChartRevenue />
-          </div>
-        </div> */}
       </>
     );
   };
-  return <div className="h-full p-6">{isAdmin ? renderEcommer() : null}</div>;
+  return <div className="h-full p-6">{renderEcommer()}</div>;
 }

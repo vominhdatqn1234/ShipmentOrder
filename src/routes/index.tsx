@@ -242,6 +242,7 @@ const childrenAdmin = [
     exact: true,
     element: <CreateEmployee />,
   },
+
   // {
   //   path: "/create-price-wedding",
   //   name: "CreatePriceWedding",
@@ -278,6 +279,12 @@ const children = [
     name: "CreateContract",
     exact: true,
     element: <CreateOrder />,
+  },
+  {
+    path: "/contract-type-list",
+    name: "ContractTypeList",
+    exact: true,
+    element: <ContractTypeList />,
   },
   // {
   //   path: "/wedding-dress-list",

@@ -51,15 +51,17 @@ const SideBar: React.FC = () => {
     navigate(`/${e.key}`);
   };
 
-  const ecommerceItem = isAdmin
-    ? getItem(
-        "Dashboard",
-        "dashboard",
-        null,
-        [getItem("Thống kê doanh thu", "ecommerce", <FcSalesPerformance />)],
-        "group"
-      )
-    : null;
+  const ecommerceItem =
+    // isAdmin
+    //   ?
+    getItem(
+      "Dashboard",
+      "dashboard",
+      null,
+      [getItem("Thống kê doanh thu", "ecommerce", <FcSalesPerformance />)],
+      "group"
+    );
+  // : null;
   const employeesItem = isAdmin
     ? getItem("Nhân viên", "employees", <HiUser />, [
         getItem("Danh sách nhân viên", "employees-list", <HiUserGroup />),
@@ -70,7 +72,7 @@ const SideBar: React.FC = () => {
   const contractItem = getItem("Orders", "contract", <FaFileContract />, [
     getItem("Danh sách đơn hàng", "contract-list", <FaRegListAlt />),
     getItem("Tạo đơn hàng", "create-contract", <MdOutlinePlaylistAdd />),
-    isAdmin
+    !isAdmin
       ? getItem(
           "Danh sách loại sản phẩm",
           "contract-type-list",

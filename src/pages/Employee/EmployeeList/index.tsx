@@ -8,11 +8,16 @@ import ColorButton from "../../../components/ColorButton";
 import { colors } from "../../../styles/colors";
 import { FaEdit } from "react-icons/fa";
 import { MdDeleteForever } from "react-icons/md";
-import { QuestionCircleOutlined } from "@ant-design/icons";
+import { QuestionCircleOutlined, FileAddOutlined } from "@ant-design/icons";
 import { collection, deleteDoc, doc } from "firebase/firestore";
 import { firestore } from "../../../lib/firebase";
 import EditEmployee from "../EditEmployee";
 import dayjs from "dayjs";
+import ProductsType from "../../Contract/ContractTypeList/ProductsTypeDetail";
+import { useEmployeesHook } from "./useEmployeeHook";
+import { useEmployeeSlice } from "../../../store/useEmployeeSlice";
+import { find } from "lodash";
+import { produce } from "immer";
 
 // const defaultValues = {
 // 	name: '',
@@ -25,6 +30,8 @@ import dayjs from "dayjs";
 // };
 export default function EmployeeList() {
   const [opened, setOpened] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
+  const [orderDetail, setOrderDetail] = useState<any>({});
   const [defaultValues, setDefaultValues] = useState<EmployeeModel>({
     id: "",
     name: "",
@@ -37,21 +44,30 @@ export default function EmployeeList() {
     avatar:
       "https://firebasestorage.googleapis.com/v0/b/mardoll-studio.appspot.com/o/profile.png?alt=media&token=317fa84c-f068-47d4-aa48-4943fad74b2b",
     createAt: "",
+    productTypes: [],
   });
-  const { data: employeeData, isLoading, refetchTeam } = useEmployee();
-  const queryClient = useQueryClient();
+  const { isLoading } = useEmployeesHook();
+  const { employees: employeeData, removeEmployeeId } = useEmployeeSlice();
   const collectionRef = collection(firestore, "employee");
 
   const handleDelete = (record: any) => async () => {
     const docRef = doc(collectionRef, record?.id);
     await deleteDoc(docRef);
-    queryClient.invalidateQueries("employee");
-    setTimeout(async () => await refetchTeam(), 300);
+    removeEmployeeId(record!.id);
   };
 
   const handleEditTeam = (record: EmployeeModel) => () => {
     setDefaultValues(record);
     setOpened(true);
+  };
+
+  const handleShowDetail = (record: EmployeeModel) => () => {
+    setShowDetail(true);
+    setOrderDetail(record?.id);
+  };
+
+  const handleCancelDetail = () => {
+    setShowDetail(false);
   };
 
   const handleCancel = () => {
@@ -146,6 +162,15 @@ export default function EmployeeList() {
       key: "x",
       render: (text, record) => (
         <div className="flex items-center gap-2">
+          <Tooltip title="Xem danh sách hóa đơn">
+            <ColorButton
+              override={colors.primary}
+              type="primary"
+              size="small"
+              icon={<FileAddOutlined />}
+              onClick={handleShowDetail(record)}
+            />
+          </Tooltip>
           <Tooltip title="Chỉnh sửa">
             <ColorButton
               override={colors.primary}
@@ -203,8 +228,23 @@ export default function EmployeeList() {
         <EditEmployee
           defaultValues={defaultValues}
           handleCancel={handleCancel}
-          refetch={refetchTeam}
+          refetch={() => {}}
         />
+      </Modal>
+      <Modal
+        title="Cập nhật cập danh sách sản phẩm"
+        open={showDetail}
+        footer={null}
+        width={1280}
+        onCancel={handleCancelDetail}
+        bodyStyle={{ overflowY: "scroll", height: "calc(100vh - 250px)" }}
+      >
+        <ProductsType orderDetail={orderDetail} />
+        {/* <EditEmployee
+          defaultValues={defaultValues}
+          handleCancel={handleCancel}
+          refetch={refetchTeam}
+        /> */}
       </Modal>
     </div>
   );

@@ -52,11 +52,17 @@ const formatNumber = (num: number) => {
   }
 };
 
+function isInvalidDate(date: any) {
+  // Check if the date.getTime() is NaN
+  return isNaN(date?.getTime?.());
+}
+
 export {
   isVietnamesePhoneNumber,
   formatCurrency,
   getStatusColor,
   regexPassword,
   formatNumber,
-  generateSlugUrl
+  generateSlugUrl,
+  isInvalidDate
 };

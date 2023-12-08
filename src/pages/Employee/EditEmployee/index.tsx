@@ -34,6 +34,7 @@ import { FormItem } from "../../../components/Form";
 import { firestore, storage } from "../../../lib/firebase";
 import { EmployeeModel } from "../../../models";
 import { isVietnamesePhoneNumber, regexPassword } from "../../../utils";
+import { useEmployeeSlice } from "../../../store/useEmployeeSlice";
 const { Dragger } = Upload;
 
 const schema = yup
@@ -85,6 +86,7 @@ export default function EditEmployee({
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
   const employeeRef = collection(firestore, "employee");
+  const { updateEmployee } = useEmployeeSlice();
   const queryClient = useQueryClient();
   const [fileList, setFileList] = useState<any[]>([
     {
@@ -330,8 +332,6 @@ export default function EditEmployee({
               avatar: fileList?.[0]?.url,
             };
             await updateDoc(docRef, payload);
-            queryClient.invalidateQueries("employee");
-            setTimeout(async () => await refetch(), 300);
             setLoading(true);
             messageApi.open({
               type: "success",
@@ -346,14 +346,13 @@ export default function EditEmployee({
             setLoading(false);
             return;
           }
-          const docRef = doc(employeeRef, defaultValues.id);
           const payload = {
             ...data,
             avatar: fileList?.[0]?.url,
           };
+          const docRef = doc(employeeRef, defaultValues.id);
           await updateDoc(docRef, payload);
-          queryClient.invalidateQueries("employee");
-          setTimeout(async () => await refetch(), 300);
+          updateEmployee(defaultValues.id, payload);
           setLoading(true);
           messageApi.open({
             type: "success",
@@ -389,7 +388,7 @@ export default function EditEmployee({
           <FormItem control={control} name="permission" label="Quyền">
             <Select>
               <Select.Option value="Admin">Admin</Select.Option>
-              <Select.Option value="Manager">Manager</Select.Option>
+              {/* <Select.Option value="Manager">Manager</Select.Option> */}
               <Select.Option value="Employee">Employee</Select.Option>
             </Select>
           </FormItem>

@@ -16,13 +16,14 @@ import { useQueryClient } from "react-query";
 import * as yup from "yup";
 import { FormItem } from "../../../components/Form";
 import { firestore } from "../../../lib/firebase";
-import { WeddingDressModel } from "../../../models";
+import { EmployeeModel, WeddingDressModel } from "../../../models";
 import { WeddingDressTypeModel } from "../../../models/WeddingDressModel";
 import { generateSlugUrl } from "../../../utils";
 import { ContractType } from "../../../models/ContractModel";
 import { ProductType } from "../../../models/ProductTypeModel";
 import { produce } from "immer";
 import { useProductTypeSlice } from "../../../store/useProductType";
+import { useEmployeeSlice } from "../../../store/useEmployeeSlice";
 
 const schema = yup
   .object({
@@ -34,10 +35,12 @@ const schema = yup
 const statusList = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
 
 export default function EditContractType({
+  parentEmployee,
   defaultValues,
   handleCancel,
   refetch,
 }: {
+  parentEmployee?: any;
   defaultValues: ProductType;
   handleCancel: () => void;
   refetch: () => void;
@@ -46,10 +49,12 @@ export default function EditContractType({
   const [form] = FormAntDeisgn.useForm();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
-  const contractRef = collection(firestore, "productType");
+  const contractRef = collection(firestore, "employee");
   const queryClient = useQueryClient();
-  const { setProductsType, productsType: productTypeData } =
-    useProductTypeSlice();
+  const { updateEmployeeId } = useEmployeeSlice();
+  console.log("parentEmployee", parentEmployee);
+  // const { setProductsType, productsType: productTypeData } =
+  //   useProductTypeSlice();
 
   const {
     control,
@@ -89,17 +94,26 @@ export default function EditContractType({
           const payload: ProductType = {
             ...data,
           };
-          const docRef = doc(contractRef, defaultValues?.id);
-          await updateDoc(docRef, payload);
-          const updatedProductsTypeArray = produce(productTypeData, (draft) => {
-            const index = draft.findIndex(
-              (todo) => todo.id === defaultValues?.id
-            );
-            if (index !== -1) {
-              draft[index] = data;
+
+          const updatedEmployeeArray = produce(
+            parentEmployee?.productTypes,
+            (productType: any) => {
+              const indexToUpdate = productType?.findIndex(
+                (item: ProductType) => item.id === payload.id
+              );
+              if (indexToUpdate !== -1) {
+                productType[indexToUpdate] = payload;
+              }
             }
+          );
+
+          updateEmployeeId(parentEmployee?.id, updatedEmployeeArray);
+
+          const docRef = doc(contractRef, parentEmployee?.id);
+          await updateDoc(docRef, {
+            ...parentEmployee,
+            productTypes: updatedEmployeeArray,
           });
-          setProductsType(updatedProductsTypeArray);
 
           messageApi.open({
             type: "success",

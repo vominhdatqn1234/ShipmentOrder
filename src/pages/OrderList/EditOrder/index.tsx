@@ -14,7 +14,7 @@ import type { FormInstance } from "antd/es/form";
 import dayjs from "dayjs";
 import { collection, doc, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { isEmpty } from "lodash";
+import { isEmpty, map, omit } from "lodash";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "react-query";
@@ -28,7 +28,7 @@ import { useUser } from "../../../store/useUser";
 import { isVietnamesePhoneNumber } from "../../../utils";
 import { OrdersModel } from "../../../models/OrdersModel";
 import { useOrderSlice } from "../../../store/useOrderSlice";
-import {produce} from "immer"
+import { produce } from "immer";
 const { Dragger } = Upload;
 
 const currentDate = dayjs();
@@ -60,7 +60,7 @@ export default function EditOrder({
   const [form] = FormAntDeisgn.useForm();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
-  const { orders, setOrders } = useOrderSlice()
+  const { orders, updateOrderId } = useOrderSlice();
   const contractRef = collection(firestore, "orders");
   // const queryClient = useQueryClient();
   const { user } = useUser();
@@ -99,6 +99,8 @@ export default function EditOrder({
       created: defaultValues?.created,
       quantity: defaultValues?.quantity,
       tracking: defaultValues?.tracking,
+      refund: defaultValues?.refund,
+      payment: defaultValues?.payment,
     });
   }, [defaultValues, form]);
 
@@ -195,26 +197,41 @@ export default function EditOrder({
         layout="vertical"
         initialValues={defaultValues}
         onFinish={handleSubmit(async (data: OrdersModel) => {
+          const discount =
+            +data?.quantity === 2 ? 3 : +data?.quantity === 3 ? 6 : 0;
           const payload: OrdersModel = {
             ...data,
             // files: fileList,
-            total: `${+data?.quantity * parseFloat(data?.price)}`,
-            tracking: `${data?.tracking || ''}`,
-            created: dayjs(data.created).toISOString() || "",
+            total: `${parseFloat(
+              `${
+                +data?.quantity * parseFloat(data?.price) +
+                parseFloat((data as any)?.shipPrice) -
+                discount
+              }`
+            ).toFixed(2)}`,
+            created: dayjs(defaultValues.created).toISOString() || "",
+            tracking: `${data?.tracking || ""}`,
           };
-          const updatedOrdersArray = produce(orders, (order: any) => {
-            const indexToUpdate = order.findIndex((item: OrdersModel) => item.id === payload.id)
-            if (indexToUpdate !== -1) {
-              order[indexToUpdate] = payload
-            }
-          })
-          setOrders(updatedOrdersArray)
-          console.log("payload", updatedOrdersArray, payload);
-          const docRef = doc(contractRef, defaultValues.id);
-          await updateDoc(docRef, payload);
-          // queryClient.invalidateQueries("orders");
-          // setTimeout(async () => await refetch(), 300);
           setLoading(true);
+          const updatedOrdersArray = produce(
+            (defaultValues as any)?.orders,
+            (order: any) => {
+              const indexToUpdate = order.findIndex(
+                (item: OrdersModel) => item.orderId === payload.orderId
+              );
+              if (indexToUpdate !== -1) {
+                order[indexToUpdate] = payload;
+              }
+            }
+          );
+          // console.log("payload", payload, updatedOrdersArray);
+          updateOrderId(payload.orderId, payload);
+
+          const docRef = doc(contractRef, (payload as any)?.parentId);
+          await updateDoc(docRef, {
+            orders: map(updatedOrdersArray, (order) => omit(order, "orders")),
+          });
+
           messageApi.open({
             type: "success",
             content: "Cập nhập thành công!",
@@ -235,11 +252,36 @@ export default function EditOrder({
           >
             <Input allowClear placeholder="Nhập mã order của khách hàng" />
           </FormItem>
-          <FormItem control={control} name="name" label="Tên khách hàng">
+          {/* <FormItem control={control} name="name" label="Tên khách hàng">
             <Input allowClear placeholder="Nhập tên khách hàng" />
+          </FormItem> */}
+          <FormItem
+            control={control}
+            name="payment"
+            label="pay"
+            valuePropName="value"
+          >
+            <InputNumber
+              style={{ width: "100%" }}
+              placeholder="Pay"
+              formatter={(value) =>
+                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+              }
+            />
           </FormItem>
-          <FormItem control={control} name="phone" label="Số điện thoại">
-            <Input allowClear placeholder="Nhập số điện thoại" />
+          <FormItem
+            control={control}
+            name="refund"
+            label="Refund"
+            valuePropName="value"
+          >
+            <InputNumber
+              style={{ width: "100%" }}
+              placeholder="Refund"
+              formatter={(value) =>
+                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+              }
+            />
           </FormItem>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
@@ -276,11 +318,7 @@ export default function EditOrder({
           </FormItem>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-3 xl:gap-6">
-        <FormItem
-            control={control}
-            name="color"
-            label="Color"
-          >
+          <FormItem control={control} name="color" label="Color">
             <Input allowClear placeholder="Nhập color" />
           </FormItem>
           <FormItem
@@ -297,13 +335,13 @@ export default function EditOrder({
               }
             />
           </FormItem>
-          <FormItem control={control} name="created" label="Ngày ngày tạo">
+          {/* <FormItem control={control} name="created" label="Ngày ngày tạo">
             <DatePicker
               format={dateFormat}
               placeholder="Vui lòng chọn ngày ngày tạo"
               style={{ width: "100%" }}
             />
-          </FormItem>
+          </FormItem> */}
         </div>
         {/* <div className="py-6">
           <FormItem

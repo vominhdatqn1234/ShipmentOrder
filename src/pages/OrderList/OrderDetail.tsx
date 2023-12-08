@@ -1,16 +1,10 @@
+import { QuestionCircleOutlined, SearchOutlined } from "@ant-design/icons";
 import {
-  FileAddOutlined,
-  QuestionCircleOutlined,
-  SearchOutlined,
-} from "@ant-design/icons";
-import {
-  Breadcrumb,
   Button,
   Input,
   InputRef,
   Modal,
   Popconfirm,
-  Skeleton,
   Space,
   Table,
   Tooltip,
@@ -22,45 +16,38 @@ import type {
 } from "antd/es/table/interface";
 import { useRef, useState } from "react";
 import Highlighter from "react-highlight-words";
+import { FaEdit } from "react-icons/fa";
 import { MdDeleteForever } from "react-icons/md";
 
 import dayjs from "dayjs";
-import { collection, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import ColorButton from "../../components/ColorButton";
-import { firestore } from "../../lib/firebase";
 import { colors } from "../../styles/colors";
+
 import { v4 as uuid } from "uuid";
 import { OrdersModel } from "../../models/OrdersModel";
 import { useOrderSlice } from "../../store/useOrderSlice";
 import { useUser } from "../../store/useUser";
 import EditOrder from "./EditOrder";
-import OrderDetail from "./OrderDetail";
-import RangePickerOrder from "./RangePickerOrder";
-import { useOrdersHook } from "./useOrdersHook";
-import { FaEdit } from "react-icons/fa";
-import { isEmpty } from "lodash";
-import SearchOrderId from "./SearchOrderId";
+import EditOrderDetail from "./EditOrderDetail";
+import { find } from "lodash";
 import { produce } from "immer";
+import { collection, doc, updateDoc } from "firebase/firestore";
+import { firestore } from "../../lib/firebase";
 
 type DataIndex = keyof OrdersModel;
 
-const OrderList = () => {
+const OrderDetail = ({ orderDetail: orderDetailProp }: any) => {
   const [searchText, setSearchText] = useState("");
   const [searchedColumn, setSearchedColumn] = useState("");
   const searchInput = useRef<InputRef>(null);
-  useOrdersHook();
-  const {
-    orders: orderData,
-    removeOrderId,
-    isLoading,
-    newTerm,
-    search,
-  } = useOrderSlice();
-  const collectionRef = collection(firestore, "orders");
+  const { orders: orderData, updateOrderId } = useOrderSlice();
   const [opened, setOpened] = useState(false);
-  const [showDetail, setShowDetail] = useState(false);
-  const [orderDetail, setOrderDetail] = useState<any>({});
   const { user } = useUser();
+  const orderRef = collection(firestore, "orders");
+
+  const orderParentValue: any = find(orderData, { id: orderDetailProp?.id });
+  //   const orderDetail = find(orderParentValue?.orders, { orderId: orderParent })
+
   const [defaultValues, setDefaultValues] = useState<OrdersModel>({
     id: "",
     name: "",
@@ -108,14 +95,10 @@ const OrderList = () => {
   const handleCancel = () => {
     setOpened(false);
   };
-  const handleCancelShowDetail = () => {
-    setShowDetail(false);
-  };
 
   const handleDelete = (record: OrdersModel) => async () => {
-    const docRef = doc(collectionRef, (record as any)?.parentId);
     const updatedOrdersArray = produce(
-      (record as any)?.orders,
+      orderParentValue?.orders,
       (order: any) => {
         const indexToUpdate = order?.findIndex(
           (item: OrdersModel) => item.orderId === record.orderId
@@ -125,14 +108,15 @@ const OrderList = () => {
         }
       }
     );
+    updateOrderId(orderParentValue?.id, updatedOrdersArray);
+
+    const docRef = doc(orderRef, orderParentValue?.id);
     await updateDoc(docRef, {
+      ...orderParentValue,
       orders: updatedOrdersArray,
     });
-    removeOrderId((record as any)?.orderId);
-  };
-  const handleShowDetail = (record: OrdersModel) => async () => {
-    setShowDetail(true);
-    setOrderDetail(record);
+    //   const docRef = doc(collectionRef, record?.id);
+    //   await deleteDoc(docRef);
   };
 
   const getColumnSearchProps = (
@@ -204,19 +188,11 @@ const OrderList = () => {
     filterIcon: (filtered: boolean) => (
       <SearchOutlined style={{ color: filtered ? "#1677ff" : undefined }} />
     ),
-    onFilter: (value: any, record: OrdersModel) => {
-      if (type === "created") {
-        return dayjs(record[dataIndex])
-          .format("DD/MM/YYYY")
-          .toString()
-          .toLowerCase()
-          .includes((value as string).toLowerCase());
-      }
-      return record[dataIndex]
+    onFilter: (value: any, record: OrdersModel) =>
+      record[dataIndex]
         .toString()
         .toLowerCase()
-        .includes((value as string).toLowerCase());
-    },
+        .includes((value as string).toLowerCase()),
     onFilterDropdownOpenChange: (visible: any) => {
       if (visible) {
         setTimeout(() => searchInput.current?.select(), 100);
@@ -271,23 +247,17 @@ const OrderList = () => {
       key: "partnerOrderId",
       ...getColumnSearchProps("partnerOrderId", "phone"),
     },
-    // {
-    //   title: "Khách hàng",
-    //   dataIndex: "name",
-    //   key: "name",
-    //   sorter: (a, b) => a.name.localeCompare(b.name),
-    //   sortDirections: ["descend", "ascend"],
-    //   ...getColumnSearchProps("name", "phone"),
-    // },
+    {
+      title: "Customer",
+      dataIndex: "name",
+      key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name),
+      sortDirections: ["descend", "ascend"],
+    },
     {
       title: "Address",
       dataIndex: "address",
       key: "address",
-    },
-    {
-      title: "Type",
-      dataIndex: "type",
-      key: "type",
     },
     {
       title: "Size",
@@ -304,26 +274,16 @@ const OrderList = () => {
       dataIndex: "quantity",
       key: "quantity",
     },
-    // {
-    //   title: "Price",
-    //   dataIndex: "price",
-    //   key: "price",
-    //   sorter: (a, b) => a.price.localeCompare(b.price),
-    //   sortDirections: ["descend", "ascend"],
-    //   render: (text: string) => {
-    //     return <p>{text} $</p>;
-    //   },
-    // },
-    // {
-    //   title: "Refund",
-    //   dataIndex: "refund",
-    //   key: "refund",
-    //   sorter: (a, b) => a.refund.localeCompare(b.refund),
-    //   sortDirections: ["descend", "ascend"],
-    //   render: (text: string) => {
-    //     return <p>{`${text ? `${text} $` : "--"}`}</p>;
-    //   },
-    // },
+    {
+      title: "Price",
+      dataIndex: "price",
+      key: "price",
+      sorter: (a, b) => a.price.localeCompare(b.price),
+      sortDirections: ["descend", "ascend"],
+      render: (text: string) => {
+        return <p>{text} $</p>;
+      },
+    },
     {
       title: "Total",
       dataIndex: "total",
@@ -331,25 +291,15 @@ const OrderList = () => {
       sorter: (a, b) => a.total.localeCompare(b.total),
       sortDirections: ["descend", "ascend"],
       render: (text: string) => {
-        return <p>{`${text ? `${text} $` : "--"}`}</p>;
+        return <p>{text} $</p>;
       },
     },
     {
-      title: "Pay",
-      dataIndex: "payment",
-      key: "payment",
-      sorter: (a, b) => a.payment.localeCompare(b.payment),
-      sortDirections: ["descend", "ascend"],
-      render: (text: string) => {
-        return <p>{`${text ? `${text} $` : "--"}`}</p>;
-      },
+      title: "Phone",
+      dataIndex: "phone",
+      key: "phone",
+      ...getColumnSearchProps("phone", "phone"),
     },
-    // {
-    //   title: "Phone",
-    //   dataIndex: "phone",
-    //   key: "phone",
-    //   ...getColumnSearchProps("phone", "phone"),
-    // },
     {
       title: "Created",
       dataIndex: "created",
@@ -369,142 +319,57 @@ const OrderList = () => {
         return <p>{text || "--"}</p>;
       },
     },
-    // {
-    //   title: "Action",
-    //   dataIndex: "editDelete",
-    //   key: "editDelete",
-    //   render: (text, record) => (
-    //     <div className="flex items-center gap-1">
-    //       {user?.permission === "Admin" ? (
-    //         <>
-    //           <Tooltip title="Chỉnh sửa">
-    //             <ColorButton
-    //               override={colors.primary}
-    //               type="primary"
-    //               size="small"
-    //               icon={<FaEdit />}
-    //               onClick={handleEditContract(record)}
-    //             />
-    //           </Tooltip>
-
-    //           <Tooltip title="Xoá">
-    //             <Popconfirm
-    //               title="Xóa order"
-    //               description="Bạn có chắc là muốn xóa?"
-    //               icon={
-    //                 <QuestionCircleOutlined style={{ color: colors.red2 }} />
-    //               }
-    //               onConfirm={handleDelete(record)}
-    //             >
-    //               <ColorButton
-    //                 override={colors.red2}
-    //                 type="primary"
-    //                 size="small"
-    //                 icon={<MdDeleteForever />}
-    //               />
-    //             </Popconfirm>
-    //           </Tooltip>
-    //         </>
-    //       ) : null}
-    //     </div>
-    //   ),
-    // },
   ];
 
-  if (user?.permission === "Admin") {
-    columns.splice(6, 0, {
-      title: "Price",
-      dataIndex: "price",
-      key: "price",
-      sorter: (a, b) => a.price.localeCompare(b.price),
-      sortDirections: ["descend", "ascend"],
-      render: (text: string) => {
-        return <p>{text} $</p>;
-      },
-    });
-  }
-  if (user?.permission === "Admin") {
-    columns.splice(7, 0, {
-      title: "Refund",
-      dataIndex: "refund",
-      key: "refund",
-      sorter: (a, b) => a.refund.localeCompare(b.refund),
-      sortDirections: ["descend", "ascend"],
-      render: (text: string) => {
-        return <p>{`${text ? `${text} $` : "--"}`}</p>;
-      },
-    });
-  }
-  if (user?.permission === "Admin") {
+  if (user?.permission === "Admin" || user?.permission === "Manager") {
     columns.push({
       title: "Action",
       dataIndex: "editDelete",
       key: "editDelete",
       render: (text, record) => (
         <div className="flex items-center gap-1">
-          <Tooltip title="Chỉnh sửa">
-            <ColorButton
-              override={colors.primary}
-              type="primary"
-              size="small"
-              icon={<FaEdit />}
-              onClick={handleEditContract(record)}
-            />
-          </Tooltip>
+          {user?.permission === "Admin" ? (
+            <>
+              <Tooltip title="Chỉnh sửa">
+                <ColorButton
+                  override={colors.primary}
+                  type="primary"
+                  size="small"
+                  icon={<FaEdit />}
+                  onClick={handleEditContract(record)}
+                />
+              </Tooltip>
 
-          <Tooltip title="Xoá">
-            <Popconfirm
-              title="Xóa order"
-              description="Bạn có chắc là muốn xóa?"
-              icon={<QuestionCircleOutlined style={{ color: colors.red2 }} />}
-              onConfirm={handleDelete(record)}
-            >
-              <ColorButton
-                override={colors.red2}
-                type="primary"
-                size="small"
-                icon={<MdDeleteForever />}
-              />
-            </Popconfirm>
-          </Tooltip>
+              <Tooltip title="Xoá">
+                <Popconfirm
+                  title="Xóa order"
+                  description="Bạn có chắc là muốn xóa?"
+                  icon={
+                    <QuestionCircleOutlined style={{ color: colors.red2 }} />
+                  }
+                  onConfirm={handleDelete(record)}
+                >
+                  <ColorButton
+                    override={colors.red2}
+                    type="primary"
+                    size="small"
+                    icon={<MdDeleteForever />}
+                  />
+                </Popconfirm>
+              </Tooltip>
+            </>
+          ) : null}
         </div>
       ),
     });
   }
 
-  if (isLoading) {
-    return (
-      <div className="m-2 p-2 md:p-10 bg-white rounded-3xl">
-        <Skeleton active />
-        <Skeleton active />
-      </div>
-    );
-  }
-  console.log("search", search);
   return (
     <div className="m-6 p-2 md:p-4 bg-white rounded-3xl">
-      <div className="flex justify-between py-4">
-        <SearchOrderId />
-        <RangePickerOrder />
-      </div>
-      <div className="mb-4">
-        <Breadcrumb
-          items={[
-            {
-              href: "/",
-              title: "Trang chủ",
-            },
-            {
-              title: "Danh sách hóa đơn",
-            },
-          ]}
-        />
-      </div>
-
       <Table
         rowKey={(record) => `${uuid()}-${record.id}`}
         columns={columns}
-        dataSource={newTerm.length >= 6 ? search : orderData}
+        dataSource={orderParentValue?.orders || []}
         bordered
         scroll={{ x: 900 }}
       />
@@ -519,26 +384,14 @@ const OrderList = () => {
           height: "calc(100vh - 250px)",
         }}
       >
-        <EditOrder
+        <EditOrderDetail
+          orderParent={orderParentValue}
           defaultValues={defaultValues}
           handleCancel={handleCancel}
           refetch={() => {}}
         />
       </Modal>
-      <Modal
-        title="Cập nhật"
-        open={showDetail}
-        footer={null}
-        onCancel={handleCancelShowDetail}
-        width={1280}
-        bodyStyle={{
-          overflowY: "scroll",
-          height: "calc(100vh - 250px)",
-        }}
-      >
-        <OrderDetail orderDetail={orderDetail} />
-      </Modal>
     </div>
   );
 };
-export default OrderList;
+export default OrderDetail;

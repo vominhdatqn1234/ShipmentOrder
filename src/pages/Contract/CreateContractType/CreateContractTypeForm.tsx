@@ -11,17 +11,19 @@ import {
   message,
 } from "antd";
 import type { FormInstance } from "antd/es/form";
-import { collection } from "firebase/firestore";
-import { isEmpty } from "lodash";
-import { useRef, useState } from "react";
+import { collection, doc, getDocs, query, updateDoc } from "firebase/firestore";
+import { find, isEmpty, map } from "lodash";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "react-query";
 import * as yup from "yup";
+import { v4 as uuidv4 } from "uuid";
 import { FormItem } from "../../../components/Form";
 import { firestore } from "../../../lib/firebase";
 import { generateSlugUrl } from "../../../utils";
 import { useContractType } from "../ContractTypeList/useContractType";
 import { ContractType } from "../../../models/ContractModel";
+import { useUser } from "../../../store/useUser";
 
 const defaultValues = {
   name: "",
@@ -31,20 +33,50 @@ const statusList = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
 
 const schema = yup
   .object({
+    userId: yup
+      .string()
+      .required("Vui lòng chọn tên nhân viên cho loại sản phẩm"),
     name: yup.string().required("Vui lòng nhập tên loại sản phẩm"),
     size: yup.string().required("Vui lòng nhập size"),
+    priceOneSide: yup.string().required("Vui lòng nhập giá 1 mặt"),
+    priceTwoSides: yup.string().required("Vui lòng nhập giá 2 mặt"),
+    shipPrice: yup.string().required("Vui lòng nhập giá giao hàng"),
   })
   .required();
 
 export default function CreateContractTypeForm() {
+  const { user } = useUser();
   const formRef = useRef<FormInstance>(null);
   const [form] = FormAntDeisgn.useForm();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
+  const [employeeList, setEmployeeList] = useState<any[]>([]);
   const weddingDressRef = collection(firestore, "productType");
-  const mutation = useFirestoreCollectionMutation(weddingDressRef);
-  const { refetch } = useContractType();
-  const queryClient = useQueryClient();
+  const employeeRef = collection(firestore, "employee");
+
+  const options: SelectProps["options"] = map(employeeList, (data) => ({
+    value: data.id,
+    label: data.name,
+  }));
+
+  useEffect(() => {
+    if (user?.permission === "Admin") {
+      const handleQuery = async () => {
+        try {
+          const ref = query(collection(firestore, "employee"));
+          const querySnapshot = await getDocs(ref);
+          let data: any = [];
+          querySnapshot.forEach((doc) => {
+            data.push({ id: doc.id, ...doc.data() });
+          });
+          setEmployeeList(data);
+        } catch (error) {
+          console.log("error fetch employee", error);
+        }
+      };
+      handleQuery();
+    }
+  }, []);
 
   const {
     control,
@@ -67,12 +99,17 @@ export default function CreateContractTypeForm() {
         initialValues={defaultValues}
         onFinish={handleSubmit(async (data) => {
           setLoading(true);
+          const isExistUser = find(employeeList, { id: data.userId });
           const payload: ContractType = {
             ...data,
+            userName: isExistUser?.name,
+            id: uuidv4(),
           };
-          mutation.mutate(payload);
-          queryClient.invalidateQueries("productType");
-          setTimeout(async () => await refetch(), 300);
+          const docRef = doc(employeeRef, isExistUser?.id);
+          await updateDoc(docRef, {
+            ...isExistUser,
+            productType: isExistUser.productTypes.push(payload),
+          });
           messageApi.open({
             type: "success",
             content: "Tạo thành công!",
@@ -84,10 +121,14 @@ export default function CreateContractTypeForm() {
           reset();
         })}
       >
-        <div className="grid grid-cols-5 gap-6">
+        <div className="grid grid-cols-3 gap-6">
+          <FormItem control={control} name="userId" label="Khách hàng">
+            <Select showSearch options={options} />
+          </FormItem>
           <FormItem control={control} name="name" label="Tên loại sản phẩm">
             <Input allowClear placeholder="Nhập tên loại sản phẩm" />
           </FormItem>
+
           <FormItem control={control} name="size" label="Size">
             <Select showSearch>
               {statusList.map((sts, index) => {

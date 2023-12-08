@@ -33,6 +33,8 @@ import EditContractType from "../EditContractType";
 import { ProductType } from "../../../models/ProductTypeModel";
 import { useProductTypeSlice } from "../../../store/useProductType";
 import { produce } from "immer";
+import { useProductTypeHook } from "./useProductTypeHook";
+import { sortBy } from "lodash";
 // import EditWeddingDressType from "../EditWeddingDressType";
 // import { useWeddingDressType } from "./useWeddingDressType";
 
@@ -43,12 +45,17 @@ const ContractTypeList = () => {
   const [searchedColumn, setSearchedColumn] = useState("");
   const searchInput = useRef<InputRef>(null);
   // const { data: productTypeData, isLoading, refetch } = useContractType();
-  const { setProductsType, productsType: productTypeData } =
-    useProductTypeSlice();
+  const {
+    setProductsType,
+    isLoading,
+    productsType: productTypeData,
+    removeProductTypeId,
+  } = useProductTypeSlice();
+  useProductTypeHook();
 
-  const collectionRef = collection(firestore, "productType");
+  const collectionRef = collection(firestore, "employee");
   const [opened, setOpened] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  // const [isLoading, setIsLoading] = useState(true);
   const [defaultValues, setDefaultValues] = useState<ProductType>({
     name: "",
     priceOneSide: "",
@@ -78,13 +85,14 @@ const ContractTypeList = () => {
   };
 
   const handleDelete = (record: any) => async () => {
-    const docRef = doc(collectionRef, record?.id);
-    await deleteDoc(docRef);
-    const deletedProductTypesArray = produce(productTypeData, (draft) => {
-      const index = draft.findIndex((todo) => todo.id === record?.id);
-      if (index !== -1) draft.splice(index, 1);
-    });
-    setProductsType(deletedProductTypesArray);
+    // removeProductTypeId(record?.id);
+    // const docRef = doc(collectionRef, record?.id);
+    // await deleteDoc(docRef);
+    // const deletedProductTypesArray = produce(productTypeData, (draft) => {
+    //   const index = draft.findIndex((todo) => todo.id === record?.id);
+    //   if (index !== -1) draft.splice(index, 1);
+    // });
+    // setProductsType(deletedProductTypesArray);
   };
 
   const handleEditContractType = (record: ProductType) => () => {
@@ -94,24 +102,24 @@ const ContractTypeList = () => {
     setOpened(true);
   };
 
-  useEffect(() => {
-    const handleQuery = async () => {
-      try {
-        const ref = query(collection(firestore, "productType"));
-        const querySnapshot = await getDocs(ref);
-        let data: any = [];
-        querySnapshot.forEach((doc) => {
-          data.push({ id: doc.id, ...doc.data() });
-        });
-        setProductsType(data);
-      } catch (error) {
-        console.log("error fetch product type", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    handleQuery();
-  }, []);
+  // useEffect(() => {
+  //   const handleQuery = async () => {
+  //     try {
+  //       const ref = query(collection(firestore, "productType"));
+  //       const querySnapshot = await getDocs(ref);
+  //       let data: any = [];
+  //       querySnapshot.forEach((doc) => {
+  //         data.push({ id: doc.id, ...doc.data() });
+  //       });
+  //       setProductsType(data);
+  //     } catch (error) {
+  //       console.log("error fetch product type", error);
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   };
+  //   handleQuery();
+  // }, []);
 
   const getColumnSearchProps = (
     dataIndex: DataIndex,
@@ -256,40 +264,40 @@ const ContractTypeList = () => {
         return <p>{text} $</p>;
       },
     },
-    {
-      title: "Chỉnh sửa",
-      dataIndex: "",
-      key: "x",
-      //   width: "12%",
-      render: (text, record) => (
-        <div className="flex items-center gap-2">
-          <Tooltip title="Chỉnh sửa">
-            <ColorButton
-              override={colors.primary}
-              type="primary"
-              size="small"
-              icon={<FaEdit />}
-              onClick={handleEditContractType(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Xoá">
-            <Popconfirm
-              title="Xóa loại sản phẩm"
-              description="Bạn có chắc là muốn xóa loại sản phẩm?"
-              icon={<QuestionCircleOutlined style={{ color: colors.red2 }} />}
-              onConfirm={handleDelete(record)}
-            >
-              <ColorButton
-                override={colors.red2}
-                type="primary"
-                size="small"
-                icon={<MdDeleteForever />}
-              />
-            </Popconfirm>
-          </Tooltip>
-        </div>
-      ),
-    },
+    // {
+    //   title: "Chỉnh sửa",
+    //   dataIndex: "",
+    //   key: "x",
+    //   //   width: "12%",
+    //   render: (text, record) => (
+    //     <div className="flex items-center gap-2">
+    //       <Tooltip title="Chỉnh sửa">
+    //         <ColorButton
+    //           override={colors.primary}
+    //           type="primary"
+    //           size="small"
+    //           icon={<FaEdit />}
+    //           onClick={handleEditContractType(record)}
+    //         />
+    //       </Tooltip>
+    //       <Tooltip title="Xoá">
+    //         <Popconfirm
+    //           title="Xóa loại sản phẩm"
+    //           description="Bạn có chắc là muốn xóa loại sản phẩm?"
+    //           icon={<QuestionCircleOutlined style={{ color: colors.red2 }} />}
+    //           onConfirm={handleDelete(record)}
+    //         >
+    //           <ColorButton
+    //             override={colors.red2}
+    //             type="primary"
+    //             size="small"
+    //             icon={<MdDeleteForever />}
+    //           />
+    //         </Popconfirm>
+    //       </Tooltip>
+    //     </div>
+    //   ),
+    // },
   ];
 
   if (isLoading) {
@@ -300,6 +308,23 @@ const ContractTypeList = () => {
       </div>
     );
   }
+  const sortingOrder: any = {
+    "T-Shirt": 1,
+    Sweatshirt: 2,
+    Hoodie: 3,
+    S: 1,
+    M: 2,
+    L: 3,
+    XL: 4,
+    "2XL": 5,
+    "3XL": 6,
+    "4XL": 7,
+    "5XL": 8,
+  };
+  const sortedProducts = sortBy(productTypeData, [
+    (product) => sortingOrder[product.name],
+    (product) => sortingOrder[product.size],
+  ]);
 
   return (
     <div className="m-2 p-2 md:p-10 bg-white rounded-3xl">
@@ -320,7 +345,7 @@ const ContractTypeList = () => {
       <Table
         rowKey={(record) => record.id}
         columns={columns as any}
-        dataSource={productTypeData}
+        dataSource={sortedProducts}
         bordered
         scroll={{ x: 800 }}
       />

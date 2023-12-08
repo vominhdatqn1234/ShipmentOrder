@@ -90,15 +90,16 @@ const DrawerMenu: ForwardRefRenderFunction<DrawerMenuRef, DrawerProps> = (
     return <Button onClick={onClose} icon={<CloseOutlined />}></Button>;
   };
   const itemDashBoard =
-    user?.permission === "Admin"
-      ? getItem(
-          "Dashboard",
-          "dashboard",
-          null,
-          [getItem("Thống kê doanh thu", "ecommerce", <FcSalesPerformance />)],
-          "group"
-        )
-      : null;
+    // user?.permission === "Admin"
+    //   ?
+    getItem(
+      "Dashboard",
+      "dashboard",
+      null,
+      [getItem("Thống kê doanh thu", "ecommerce", <FcSalesPerformance />)],
+      "group"
+    );
+  // : null;
 
   const employeesItem = isAdmin
     ? getItem("Employees", "employees", <HiUser />, [
@@ -113,7 +114,7 @@ const DrawerMenu: ForwardRefRenderFunction<DrawerMenuRef, DrawerProps> = (
     getItem("Orders", "contract", <FaFileContract />, [
       getItem("Danh sách đơn hàng", "contract-list", <FaRegListAlt />),
       getItem("Tạo đơn hàng", "create-contract", <MdOutlinePlaylistAdd />),
-      isAdmin
+      !isAdmin
         ? getItem(
             "Danh sách loại sản phẩm",
             "contract-type-list",

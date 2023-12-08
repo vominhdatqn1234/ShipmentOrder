@@ -15,9 +15,10 @@ import {
 } from "antd";
 import type { FormInstance } from "antd/es/form";
 import dayjs, { Dayjs } from "dayjs";
-import { collection } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query } from "firebase/firestore";
 import {
   find,
+  groupBy,
   isEmpty,
   isNull,
   lowerCase,
@@ -25,7 +26,7 @@ import {
   some,
   startsWith,
 } from "lodash";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "react-query";
 // import {
@@ -46,7 +47,7 @@ import { FormItem } from "../../../components/Form";
 import { firestore } from "../../../lib/firebase";
 import { OrdersModel } from "../../../models/OrdersModel";
 import { useUser } from "../../../store/useUser";
-import { isVietnamesePhoneNumber } from "../../../utils";
+import { isInvalidDate, isVietnamesePhoneNumber } from "../../../utils";
 import { useContractType } from "../../Contract/ContractTypeList/useContractType";
 import { useOrders } from "../useOrders";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -89,13 +90,14 @@ export default function CreateOrderForm() {
   const [form] = FormAntDeisgn.useForm();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
+  const [errorDate, setErrorDate] = useState(false);
   const contractRef = collection(firestore, "orders");
+  const searchOrderRef = collection(firestore, "searchOrders");
   const [fileList, setFileList] = useState<any[]>([]);
   const [fileExcelData, setFileExcelData] = useState<any[]>([]);
   const mutation = useFirestoreCollectionMutation(contractRef);
-  const { refetch } = useOrders();
-  const { data: productType } = useContractType();
-  const queryClient = useQueryClient();
+  const mutationSearchOrder = useFirestoreCollectionMutation(searchOrderRef);
+  const [productTypes, setProductTypes] = useState<any[]>([]);
   const uuId = uuidv4();
   const { user } = useUser();
   const isAdmin = user?.permission === "Admin";
@@ -114,6 +116,20 @@ export default function CreateOrderForm() {
     defaultValues,
     resolver: yupResolver(schema),
   });
+
+  useEffect(() => {
+    const handleQuery = async () => {
+      try {
+        const employeeRef = collection(firestore, "employee");
+        const docRef = doc(employeeRef, user?.id);
+        const querySnapshot = await getDoc(docRef);
+        setProductTypes(querySnapshot.data()?.productTypes || []);
+      } catch (error) {
+        console.log("error fetch employee", error);
+      }
+    };
+    handleQuery();
+  }, []);
 
   const handleUpload = async (info: any) => {
     if (info.file.status === "done") {
@@ -178,7 +194,7 @@ export default function CreateOrderForm() {
       const reader = new FileReader();
       const calculateSum = (data: any) => {
         // Assuming your Excel file has a column named 'price'
-        const mapProductType = map(productType as any, (item) => ({
+        const mapProductType = map(productTypes as any, (item) => ({
           ...item,
           name: lowerCase(item?.name),
         }));
@@ -237,11 +253,36 @@ export default function CreateOrderForm() {
               ? isExistItem?.priceTwoSides
               : isExistItem?.priceOneSide;
           const format = "DD/MM/YYYY";
+
           const typeCreated =
             typeof item["Date"] === "number"
-              ? getJsDateFromExcel?.(item["Date"])
+              ? dayjs(`${getJsDateFromExcels?.(item["Date"])}`, format)
               : dayjs(item["Date"], format);
+          const discount = +quantity === 2 ? 3 : +quantity === 3 ? 6 : 0;
+          const total =
+            +quantity * parseFloat(+designPrice as any) +
+            parseFloat(isExistItem?.shipPrice);
 
+          function getJsDateFromExcels(excelSerialDate: any) {
+            const secondsInDay = 24 * 60 * 60;
+            const excelEpoch = new Date("1899-12-30T00:00:00Z"); // Excel epoch
+
+            // Convert Excel serial date to milliseconds
+            const excelSerialMs = excelSerialDate * secondsInDay * 1000;
+
+            // Calculate the JavaScript date
+            const jsDate = new Date(excelEpoch.getTime() + excelSerialMs);
+
+            // Format the date as "dd/mm/yyyy"
+            const formattedDate = `${(jsDate.getMonth() + 1)
+              .toString()
+              .padStart(2, "0")}/${jsDate
+              .getDate()
+              .toString()
+              .padStart(2, "0")}/${jsDate.getFullYear()}`;
+
+            return formattedDate;
+          }
           return {
             created: dayjs(typeCreated).toISOString(),
             address: item["Address line 1"] || "",
@@ -257,12 +298,13 @@ export default function CreateOrderForm() {
             tracking: item["Tracking"] || "",
             phone: item["Phone"] || "",
             color: item["Color"] || "",
+            refund: "",
             price: `${+designPrice}`,
             shipPrice: `${isExistItem?.shipPrice}`,
-            total: `${parseFloat(
-              +quantity * +designPrice + isExistItem?.shipPrice
-            ).toFixed(2)}`,
+            total: parseFloat(`${+total - discount}`).toFixed(2),
             userId: user?.id,
+            createdUserName: user?.name,
+            orderId: uuidv4(),
           };
         });
         setFileExcelData(mapFileExcel);
@@ -505,81 +547,81 @@ export default function CreateOrderForm() {
       dataIndex: "color",
       key: "color",
     },
-    {
-      title: "Design Front",
-      dataIndex: "imageFront",
-      key: "imageFront",
-      render: (text, record) => {
-        return (
-          <div className="flex flex-col gap-2 items-center">
-            <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
-              {!isEmpty(text) ? (
-                <Image
-                  src={text}
-                  width={40}
-                  height={40}
-                  preview={{
-                    mask: <AiOutlineEye />,
-                  }}
-                />
-              ) : (
-                "--"
-              )}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      title: "Design Back",
-      dataIndex: "imageBack",
-      key: "imageBack",
-      render: (text, record) => {
-        return (
-          <div className="flex flex-col items-center">
-            <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
-              {!isEmpty(text) ? (
-                <Image
-                  src={text}
-                  width={40}
-                  height={40}
-                  preview={{
-                    mask: <AiOutlineEye />,
-                  }}
-                />
-              ) : (
-                "--"
-              )}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      title: "Mockup",
-      dataIndex: "mockup",
-      key: "mockup",
-      render: (text, record) => {
-        return (
-          <div className="flex flex-col items-center">
-            <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
-              {!isEmpty(text) ? (
-                <Image
-                  src={text}
-                  width={40}
-                  height={40}
-                  preview={{
-                    mask: <AiOutlineEye />,
-                  }}
-                />
-              ) : (
-                "--"
-              )}
-            </div>
-          </div>
-        );
-      },
-    },
+    // {
+    //   title: "Design Front",
+    //   dataIndex: "imageFront",
+    //   key: "imageFront",
+    //   render: (text, record) => {
+    //     return (
+    //       <div className="flex flex-col gap-2 items-center">
+    //         <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
+    //           {!isEmpty(text) ? (
+    //             <Image
+    //               src={text}
+    //               width={40}
+    //               height={40}
+    //               preview={{
+    //                 mask: <AiOutlineEye />,
+    //               }}
+    //             />
+    //           ) : (
+    //             "--"
+    //           )}
+    //         </div>
+    //       </div>
+    //     );
+    //   },
+    // },
+    // {
+    //   title: "Design Back",
+    //   dataIndex: "imageBack",
+    //   key: "imageBack",
+    //   render: (text, record) => {
+    //     return (
+    //       <div className="flex flex-col items-center">
+    //         <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
+    //           {!isEmpty(text) ? (
+    //             <Image
+    //               src={text}
+    //               width={40}
+    //               height={40}
+    //               preview={{
+    //                 mask: <AiOutlineEye />,
+    //               }}
+    //             />
+    //           ) : (
+    //             "--"
+    //           )}
+    //         </div>
+    //       </div>
+    //     );
+    //   },
+    // },
+    // {
+    //   title: "Mockup",
+    //   dataIndex: "mockup",
+    //   key: "mockup",
+    //   render: (text, record) => {
+    //     return (
+    //       <div className="flex flex-col items-center">
+    //         <div className="overflow-hidden rounded-lg drop-shadow-lg w-[40px] h-[40px]">
+    //           {!isEmpty(text) ? (
+    //             <Image
+    //               src={text}
+    //               width={40}
+    //               height={40}
+    //               preview={{
+    //                 mask: <AiOutlineEye />,
+    //               }}
+    //             />
+    //           ) : (
+    //             "--"
+    //           )}
+    //         </div>
+    //       </div>
+    //     );
+    //   },
+    // },
     {
       title: "Quantity",
       dataIndex: "quantity",
@@ -628,6 +670,7 @@ export default function CreateOrderForm() {
   function hasNaNTotal(arr: any = []) {
     return some(arr, (obj) => obj.total === "NaN");
   }
+  console.log("fileExcelData", fileExcelData);
   return (
     <>
       {contextHolder}
@@ -652,7 +695,17 @@ export default function CreateOrderForm() {
           //   data: fileExcelData,
           //   created: dayjs()?.toISOString?.() || "",
           // };
-          fileExcelData.forEach(
+          const groupedData = groupBy(fileExcelData, (item) => item.created);
+          const groupedArray = Object.entries(groupedData).map(
+            ([created, orders]) => ({
+              created,
+              orders,
+              createdUser: user?.id,
+              name: user?.name,
+            })
+          );
+
+          groupedArray.forEach(
             (item) =>
               new Promise((resolve, reject) => {
                 try {
@@ -663,10 +716,21 @@ export default function CreateOrderForm() {
                 }
               })
           );
+          fileExcelData.forEach(
+            (item) =>
+              new Promise((resolve, reject) => {
+                try {
+                  mutationSearchOrder.mutate(item);
+                  resolve(item);
+                } catch (error) {
+                  reject(error);
+                }
+              })
+          );
           // console.log("payload", payload);
           // mutation.mutate(payload);
-          queryClient.invalidateQueries("orders");
-          setTimeout(async () => await refetch(), 300);
+          // queryClient.invalidateQueries("orders");
+          // setTimeout(async () => await refetch(), 300);
           setLoading(true);
           messageApi.open({
             type: "success",
@@ -786,7 +850,7 @@ export default function CreateOrderForm() {
             <Editor />
           </FormItem>
         </div> */}
-        {hasNaNTotal(fileExcelData) ? (
+        {hasNaNTotal(fileExcelData) || errorDate ? (
           <span className="pb-6 text-base text-red-700">
             File upload có giá trị total không thoả điều kiện nên không được tạo
           </span>
@@ -794,7 +858,9 @@ export default function CreateOrderForm() {
 
         <Button
           loading={loading}
-          disabled={fileExcelData.length <= 0 || hasNaNTotal(fileExcelData)}
+          disabled={
+            fileExcelData.length <= 0 || hasNaNTotal(fileExcelData) || errorDate
+          }
           type="primary"
           htmlType="submit"
           block

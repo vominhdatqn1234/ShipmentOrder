@@ -20,4 +20,7 @@ export type OrdersModel = {
   userId: string;
   tracking: string;
   color: string;
+  orderId: string;
+  refund: string;
+  payment: string;
 };

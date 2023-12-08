@@ -260,7 +260,7 @@ export default function CreateEmployeeForm() {
             setLoading(false);
             return;
           }
-          const payload = { ...data, createAt: new Date().toISOString() };
+          const payload = { ...data, createAt: new Date().toISOString(), productTypes: [] };
           mutation.mutate(payload);
           queryClient.invalidateQueries("employee");
           setTimeout(async () => await refetchTeam(), 300);

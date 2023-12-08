@@ -9,6 +9,7 @@ type EmployeeModel = {
 	email: string;
 	phone: string;
 	address: string;
+	productTypes: any[];
 }
 
 export type {
