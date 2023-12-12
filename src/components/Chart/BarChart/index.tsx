@@ -911,7 +911,49 @@ export default function BarChartRevenue() {
       const total = reduce(
         item.orders,
         (res, el) => {
-          res += parseFloat(el.total);
+          res += parseFloat(el?.total || 0);
+          return res;
+        },
+        0
+      );
+      // const totalRefund = reduce(
+      //   item.orders,
+      //   (res, el) => {
+      //     res += parseFloat(el?.refund || 0);
+      //     return res;
+      //   },
+      //   0
+      // );
+      result[item.name][dataIndex] += total;
+    }
+
+    return result;
+  }, {});
+
+  const datasetsQuantityMonth = ordersMonthData.reduce((result: any, item) => {
+    // const itemMonth = item.created.substring(5, 7);
+
+    // const itemDay = dayjs(item.created).toISOString().substring(8, 10);
+    // const itemMonth = item.created.substring(5, 7);
+    // const itemMonth = `${dayjs(item.created).month() + 1}`;
+    const formatDay = dayjs(item.created).format("DD/MM");
+    // const itemMonth = dayjs(item.created).format("DD/MM/YYYY").substring(5, 7);
+    // const itemMonth = dayjs(item.createDate).month() + 1;
+    const dataIndex = sortedOrderMonths.indexOf(formatDay);
+    // const formatDay = dayjs(item.created).format("DD/MM");
+    //   const dataIndex = sortedDays.indexOf(formatDay);
+    // const dataIndex = sortedDays.indexOf(`${itemDay}/${itemMonth}`);
+    // console.log("tttt", dayjs(item.created).format("DD/MM"));
+    // console.log("sortedDays", sortedDays, dataIndex, `${itemDay}/${itemMonth}`);
+
+    if (dataIndex !== -1) {
+      if (!result[item.name]) {
+        result[item.name] = Array(sortedOrderMonths.length).fill(0);
+      }
+      const total = reduce(
+        item.orders,
+        (res, el) => {
+          res += parseFloat(el?.quantity || 0);
           return res;
         },
         0
@@ -1456,6 +1498,12 @@ export default function BarChartRevenue() {
       data: datasetsMonth[type],
     };
   });
+  const seriesQuantityMonth = Object.keys(datasetsQuantityMonth).map((type) => {
+    return {
+      name: type,
+      data: datasetsQuantityMonth[type],
+    };
+  });
 
   const seriresType = Object.keys(datasetsType).map((type) => {
     return {
@@ -1477,6 +1525,8 @@ export default function BarChartRevenue() {
   const labelsRefundTotal = keys(groupedRefundData);
   const groupedUnPaidData = groupBy(seriesUnPaidMonth, (item) => item.name);
   const labelsUnPaidTotal = keys(groupedUnPaidData);
+  const groupedUnQuantityData = groupBy(seriesQuantityMonth, (item) => item.name);
+  const labelsQuantityTotal = keys(groupedUnQuantityData);
 
   const seriesTotal = map(seriesMonth, (item, index) => {
     if (item.name === labelsTotal[index]) {
@@ -1514,6 +1564,94 @@ export default function BarChartRevenue() {
     }
     return 0;
   });
+  const seriesQuantityTotal = map(seriesQuantityMonth, (item, index) => {
+    if (item.name === labelsQuantityTotal[index]) {
+      return reduce(
+        item.data,
+        (rel, val) => {
+          return (rel += val);
+        },
+        0
+      );
+    }
+    return 0;
+  });
+
+  const optionsQuantityTotal = {
+    labels: labelsQuantityTotal,
+    colors: [
+      colors.primary,
+      "#feb01a",
+      "#00e396",
+      "#ff0000",
+      "#1677ff",
+      "#eb2f96",
+      "#6ca5a5",
+      "#b414e5",
+      "#75631d",
+      "#1d5c75",
+      "#31733a",
+      "#503e57",
+    ],
+    chart: {
+      width: 380,
+      height: 280,
+      type: "donut",
+      foreColor: "#adb0bb",
+      fontFamily: "DM sans",
+    },
+    dataLabels: {
+      enabled: true,
+    },
+    responsive: [
+      {
+        breakpoint: 480,
+        options: {
+          chart: {
+            width: 240,
+          },
+          legend: {
+            show: true,
+          },
+        },
+      },
+    ],
+    legend: {
+      position: "right",
+      offsetY: 0,
+      height: 230,
+    },
+    plotOptions: {
+      pie: {
+        customScale: 0.8, // Adjust the size of the donut
+        donut: {
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total Quantity",
+              formatter: function (w: any) {
+                return (
+                  w.globals.seriesTotals
+                    .reduce((a: any, b: any) => a + b, 0).toFixed?.(2)
+                );
+              },
+            },
+          },
+        },
+      },
+    },
+    tooltip: {
+      theme: "dark",
+      fillSeriesColor: false,
+      y: {
+        formatter: function (val: any) {
+          return `${val?.toFixed?.(2)}`;
+        },
+      },
+    },
+  };
+  
   const optionsTotal = {
     labels: labelsTotal,
     colors: [
@@ -1804,12 +1942,21 @@ export default function BarChartRevenue() {
         /> */}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <div className="">
           <h4>Tổng tiền hoá đơn trong tháng</h4>
           <Chart
             options={optionsTotal as any}
             series={seriesTotal}
+            type="donut"
+            height="280"
+          />
+        </div>
+        <div className="">
+          <h4>Tổng số lượng hoá đơn trong tháng</h4>
+          <Chart
+            options={optionsQuantityTotal as any}
+            series={seriesQuantityTotal}
             type="donut"
             height="280"
           />
