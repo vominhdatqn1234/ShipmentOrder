@@ -98,6 +98,7 @@ export default function BarChartClient() {
   //     })
   //   )
   // );
+
   const uniqueMonths = Array.from(
     new Set(
       filteredData.map((item) => {
@@ -146,6 +147,40 @@ export default function BarChartClient() {
         item.orders,
         (res, el) => {
           res += parseFloat(el?.total || 0);
+          return res;
+        },
+        0
+      );
+      result[item.name][dataIndex] += +total;
+    }
+
+    return result;
+  }, {});
+
+  const datasetsQuantityMonth = ordersMonthData.reduce((result: any, item) => {
+    // const itemMonth = item.created.substring(5, 7);
+
+    // const itemDay = dayjs(item.created).toISOString().substring(8, 10);
+    // const itemMonth = item.created.substring(5, 7);
+    // const itemMonth = item.created.substring(5, 7);
+    // const itemMonth = `${dayjs(item.created).month() + 1}`;
+    const formatDay = dayjs(item.created).format("DD/MM");
+    // const itemMonth = dayjs(item.createDate).month() + 1;
+    const dataIndex = sortedOrderMonths.indexOf(formatDay);
+    // const formatDay = dayjs(item.created).format("DD/MM");
+    //   const dataIndex = sortedDays.indexOf(formatDay);
+    // const dataIndex = sortedDays.indexOf(`${itemDay}/${itemMonth}`);
+    // console.log("tttt", dayjs(item.created).format("DD/MM"));
+    // console.log("sortedDays", sortedDays, dataIndex, `${itemDay}/${itemMonth}`);
+
+    if (dataIndex !== -1) {
+      if (!result[item.name]) {
+        result[item.name] = Array(sortedOrderMonths.length).fill(0);
+      }
+      const total = reduce(
+        item.orders,
+        (res, el) => {
+          res += parseFloat(el?.quantity || 0);
           return res;
         },
         0
@@ -811,28 +846,28 @@ export default function BarChartClient() {
     },
   };
 
-  useEffect(() => {
-    const handleQuery = async () => {
-      const todayStart = dayjs(defaultValue).startOf("day");
-      const todayEnd = dayjs(defaultValue).endOf("day");
-      // const sixDaysAgo = dayjs().subtract(6, 'days').startOf('day');
-      // const startOfMonth = dayjs(defaultValue).startOf("month");
-      // const endOfMonth = dayjs(defaultValue).endOf("month");
-      const ref = query(
-        collection(firestore, "orders"),
-        where("createdUser", "==", user?.id),
-        where("created", ">=", todayStart.toISOString()),
-        where("created", "<=", todayEnd.toISOString())
-      );
-      const querySnapshot = await getDocs(ref);
-      let data: any = [];
-      querySnapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() });
-      });
-      setOrdersData(data);
-    };
-    handleQuery();
-  }, [defaultValue]);
+  // useEffect(() => {
+  //   const handleQuery = async () => {
+  //     const todayStart = dayjs(defaultValue).startOf("day");
+  //     const todayEnd = dayjs(defaultValue).endOf("day");
+  //     // const sixDaysAgo = dayjs().subtract(6, 'days').startOf('day');
+  //     // const startOfMonth = dayjs(defaultValue).startOf("month");
+  //     // const endOfMonth = dayjs(defaultValue).endOf("month");
+  //     const ref = query(
+  //       collection(firestore, "orders"),
+  //       where("createdUser", "==", user?.id),
+  //       where("created", ">=", todayStart.toISOString()),
+  //       where("created", "<=", todayEnd.toISOString())
+  //     );
+  //     const querySnapshot = await getDocs(ref);
+  //     let data: any = [];
+  //     querySnapshot.forEach((doc) => {
+  //       data.push({ id: doc.id, ...doc.data() });
+  //     });
+  //     setOrdersData(data);
+  //   };
+  //   handleQuery();
+  // }, [defaultValue]);
 
   useEffect(() => {
     const handleQuery = async () => {
@@ -846,6 +881,7 @@ export default function BarChartClient() {
         where("created", ">=", startOfMonth.toISOString()),
         where("created", "<=", endOfMonth.toISOString())
       );
+      console.log('endOfMonth', user?.id)
 
       const querySnapshot = await getDocs(ref);
       let data: any = [];
@@ -911,14 +947,20 @@ export default function BarChartClient() {
       data: datasetsMonth[type],
     };
   });
-  const seriesQuantityMonth = Object.keys(datasetQuantityMonthTypes).map(
-    (type) => {
-      return {
-        name: type,
-        data: datasetQuantityMonthTypes[type],
-      };
-    }
-  );
+  const seriesQuantityMonth = Object.keys(datasetsQuantityMonth).map((type) => {
+    return {
+      name: "Total",
+      data: datasetsQuantityMonth[type],
+    };
+  });
+  // const seriesQuantityMonth = Object.keys(datasetQuantityMonthTypes).map(
+  //   (type) => {
+  //     return {
+  //       name: type,
+  //       data: datasetQuantityMonthTypes[type],
+  //     };
+  //   }
+  // );
 
   const optionsTotal = {
     labels: ["Tổng Order"],
@@ -957,6 +999,26 @@ export default function BarChartClient() {
       offsetY: 0,
       height: 230,
     },
+    plotOptions: {
+      pie: {
+        customScale: 0.8, // Adjust the size of the donut
+        donut: {
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total",
+              formatter: function (w: any) {
+                return (
+                  w.globals.seriesTotals
+                    .reduce((a: any, b: any) => a + b, 0).toFixed?.(2)
+                )
+              },
+            },
+          },
+        },
+      },
+    },
     tooltip: {
       theme: "dark",
       fillSeriesColor: false,
@@ -968,9 +1030,9 @@ export default function BarChartClient() {
     },
   };
 
-  const optionsTotalRefund = {
-    labels: ["Tổng Refund"],
-    colors: ["#feb01a", "#00e396"],
+  const optionsQuantityTotal = {
+    labels: ["Tổng số lượng"],
+    colors: ["#31733a"],
     // chart: {
     //     height: 280,
     //     type: 'donut',
@@ -1004,6 +1066,94 @@ export default function BarChartClient() {
       position: "right",
       offsetY: 0,
       height: 230,
+    },
+    plotOptions: {
+      pie: {
+        customScale: 0.8, // Adjust the size of the donut
+        donut: {
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total Quantity",
+              formatter: function (w: any) {
+                return (
+                  w.globals.seriesTotals
+                    .reduce((a: any, b: any) => a + b, 0).toFixed?.(2)
+                );
+              },
+            },
+          },
+        },
+      },
+    },
+    tooltip: {
+      theme: "dark",
+      fillSeriesColor: false,
+      y: {
+        formatter: function (val: any) {
+          return `${val?.toFixed?.(2)}`;
+        },
+      },
+    },
+  };
+
+  const optionsTotalRefund = {
+    labels: ["Tổng Refund"],
+    colors: ["#75631d"],
+    // chart: {
+    //     height: 280,
+    //     type: 'donut',
+    //     foreColor: '#adb0bb',
+    //     fontFamily: 'DM sans',
+    // },
+    chart: {
+      width: 380,
+      height: 280,
+      type: "donut",
+      foreColor: "#adb0bb",
+      fontFamily: "DM sans",
+    },
+    dataLabels: {
+      enabled: false,
+    },
+    responsive: [
+      {
+        breakpoint: 480,
+        options: {
+          chart: {
+            width: 240,
+          },
+          legend: {
+            show: false,
+          },
+        },
+      },
+    ],
+    legend: {
+      position: "right",
+      offsetY: 0,
+      height: 230,
+    },
+    plotOptions: {
+      pie: {
+        customScale: 0.8, // Adjust the size of the donut
+        donut: {
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total",
+              formatter: function (w: any) {
+                return (
+                  w.globals.seriesTotals
+                    .reduce((a: any, b: any) => a + b, 0).toFixed?.(2)
+                )
+              },
+            },
+          },
+        },
+      },
     },
     tooltip: {
       theme: "dark",
@@ -1017,7 +1167,7 @@ export default function BarChartClient() {
   };
   const optionsTotalUnPaid = {
     labels: ["Tổng Unpaid"],
-    colors: ["#00e396"],
+    colors: ["#6ca5a5"],
     // chart: {
     //     height: 280,
     //     type: 'donut',
@@ -1052,6 +1202,26 @@ export default function BarChartClient() {
       offsetY: 0,
       height: 230,
     },
+    plotOptions: {
+      pie: {
+        customScale: 0.8, // Adjust the size of the donut
+        donut: {
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total",
+              formatter: function (w: any) {
+                return (
+                  w.globals.seriesTotals
+                    .reduce((a: any, b: any) => a + b, 0).toFixed?.(2)
+                )
+              },
+            },
+          },
+        },
+      },
+    },
     tooltip: {
       theme: "dark",
       fillSeriesColor: false,
@@ -1062,14 +1232,7 @@ export default function BarChartClient() {
       },
     },
   };
-  console.log(
-    "seriesMonth",
-    seriesType,
-    sumBy(
-      seriesType[0]?.data,
-      (item) => +`${parseFloat(`${item || 0}`).toFixed(2)}`
-    )
-  );
+
   return (
     <div>
       {/* <div className="flex items-center justify-between">
@@ -1101,7 +1264,7 @@ export default function BarChartClient() {
         />
       </div>
       <div className="grid grid-cols-1 gap-2">
-        <Chart options={optionsMonth} series={seriesMonth} type="bar" />
+        <Chart options={optionsMonth} series={seriesMonth} type="bar" height="280" />
         {/* <Chart
           options={optionQuantityMonthTypes}
           series={seriesQuantityMonth}
@@ -1109,7 +1272,7 @@ export default function BarChartClient() {
         /> */}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <div className="">
           <h4>Tổng tiền hoá đơn trong tháng</h4>
           <Chart
@@ -1117,6 +1280,20 @@ export default function BarChartClient() {
             series={[
               sumBy(
                 seriesMonth[0]?.data,
+                (item) => +`${parseFloat(`${item || 0}`).toFixed(2)}`
+              ),
+            ]}
+            type="donut"
+            height="280"
+          />
+        </div>
+        <div className="">
+          <h4>Tổng số lương hoá đơn trong tháng</h4>
+          <Chart
+            options={optionsQuantityTotal as any}
+            series={[
+              sumBy(
+                seriesQuantityMonth[0]?.data,
                 (item) => +`${parseFloat(`${item || 0}`).toFixed(2)}`
               ),
             ]}
