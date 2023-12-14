@@ -210,8 +210,9 @@ export default function EditOrder({
                 discount
               }`
             ).toFixed(2)}`,
-            payment: defaultValues?.payment || '',
+            payment: data?.payment || '',
             created: dayjs(defaultValues.created).toISOString() || "",
+            note: data?.note || '',
             tracking: `${data?.tracking || ""}`,
           };
           setLoading(true);
@@ -226,7 +227,6 @@ export default function EditOrder({
               }
             }
           ) : [];
-          // console.log("payload", payload, updatedOrdersArray);
           updateOrderId(defaultValues.orderId, payload);
           const docRef = doc(contractRef,(defaultValues as any)?.parentId);
           await updateDoc(docRef, {
@@ -236,7 +236,7 @@ export default function EditOrder({
           messageApi.open({
             type: "success",
             content: "Cập nhập thành công!",
-            duration: 5,
+            duration: 1,
           });
           setLoading(false);
           handleCancel?.();
