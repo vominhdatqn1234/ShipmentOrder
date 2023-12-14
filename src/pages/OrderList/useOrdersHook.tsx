@@ -37,6 +37,7 @@ export function useOrdersHook() {
           querySnapshot.forEach((doc) => {
             const mapParentIdProductType = map(doc.data()?.orders, (order) => ({
               ...order,
+              orders: doc.data()?.orders,
               parentId: doc.id,
             }));
             arr.push(...mapParentIdProductType);
