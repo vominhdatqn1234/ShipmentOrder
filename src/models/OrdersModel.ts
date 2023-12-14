@@ -23,4 +23,5 @@ export type OrdersModel = {
   orderId: string;
   refund: string;
   payment: string;
+  note: string;
 };
