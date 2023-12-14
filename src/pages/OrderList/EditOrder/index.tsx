@@ -101,6 +101,7 @@ export default function EditOrder({
       tracking: defaultValues?.tracking,
       refund: defaultValues?.refund,
       payment: defaultValues?.payment,
+      note: defaultValues?.note
     });
   }, [defaultValues, form]);
 
@@ -209,11 +210,12 @@ export default function EditOrder({
                 discount
               }`
             ).toFixed(2)}`,
+            payment: defaultValues?.payment || '',
             created: dayjs(defaultValues.created).toISOString() || "",
             tracking: `${data?.tracking || ""}`,
           };
           setLoading(true);
-          const updatedOrdersArray = produce(
+          const updatedOrdersArray = (defaultValues as any)?.orders?.length > 0 ? produce(
             (defaultValues as any)?.orders,
             (order: any) => {
               const indexToUpdate = order.findIndex(
@@ -223,11 +225,10 @@ export default function EditOrder({
                 order[indexToUpdate] = payload;
               }
             }
-          );
+          ) : [];
           // console.log("payload", payload, updatedOrdersArray);
-          updateOrderId(payload.orderId, payload);
-
-          const docRef = doc(contractRef, (payload as any)?.parentId);
+          updateOrderId(defaultValues.orderId, payload);
+          const docRef = doc(contractRef,(defaultValues as any)?.parentId);
           await updateDoc(docRef, {
             orders: map(updatedOrdersArray, (order) => omit(order, "orders")),
           });
@@ -250,7 +251,7 @@ export default function EditOrder({
             name="partnerOrderId"
             label="Partner OrderId"
           >
-            <Input allowClear placeholder="Nhập mã order của khách hàng" />
+            <Input allowClear disabled placeholder="Nhập mã order của khách hàng" />
           </FormItem>
           {/* <FormItem control={control} name="name" label="Tên khách hàng">
             <Input allowClear placeholder="Nhập tên khách hàng" />
@@ -334,6 +335,13 @@ export default function EditOrder({
                 `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
               }
             />
+          </FormItem>
+          <FormItem
+            control={control}
+            name="note"
+            label="Note"
+          >
+            <Input.TextArea placeholder="Nhập ghi chú" />
           </FormItem>
           {/* <FormItem control={control} name="created" label="Ngày ngày tạo">
             <DatePicker
