@@ -260,8 +260,9 @@ export default function CreateOrderForm() {
               : dayjs(item["Date"], format);
           const discount = +quantity === 2 ? 3 : +quantity === 3 ? 6 : 0;
           const total =
-            +quantity * (parseFloat(+designPrice as any) +
-            parseFloat(isExistItem?.shipPrice));
+            +quantity *
+            (parseFloat(+designPrice as any) +
+              parseFloat(isExistItem?.shipPrice));
 
           function getJsDateFromExcels(excelSerialDate: any) {
             const secondsInDay = 24 * 60 * 60;
@@ -290,8 +291,8 @@ export default function CreateOrderForm() {
             imageFront: getDirectImageLink(item["Design Front"] || ""),
             imageBack: getDirectImageLink(item["Design Back"] || ""),
             mockup: getDirectImageLink(item["Mockup"] || ""),
-            name: `${item["First name"] || ''} ${item["Last name"] || ""}`,
-            partnerOrderId: item["Order ID"] || "",
+            name: `${item["First name"] || ""} ${item["Last name"] || ""}`,
+            partnerOrderId: `${item["Order ID"] || ""}`,
             quantity,
             type: item["Type"] || "",
             size: item["Size"] || "",
