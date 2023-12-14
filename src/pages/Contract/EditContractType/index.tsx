@@ -52,9 +52,6 @@ export default function EditContractType({
   const contractRef = collection(firestore, "employee");
   const queryClient = useQueryClient();
   const { updateEmployeeId } = useEmployeeSlice();
-  console.log("parentEmployee", parentEmployee);
-  // const { setProductsType, productsType: productTypeData } =
-  //   useProductTypeSlice();
 
   const {
     control,
@@ -78,6 +75,12 @@ export default function EditContractType({
       shipPrice: defaultValues.shipPrice,
       size: defaultValues.size,
     });
+    setValue('id', defaultValues?.id)
+    setValue('name', defaultValues?.name)
+    setValue('priceOneSide', defaultValues?.priceOneSide)
+    setValue('priceTwoSides', defaultValues?.priceTwoSides)
+    setValue('shipPrice', defaultValues?.shipPrice)
+    setValue('size', defaultValues?.size)
   }, [defaultValues, form]);
 
   return (
@@ -94,7 +97,7 @@ export default function EditContractType({
           const payload: ProductType = {
             ...data,
           };
-
+          console.log('payloadpayloadpayload', payload)
           const updatedEmployeeArray = produce(
             parentEmployee?.productTypes,
             (productType: any) => {
