@@ -69,6 +69,7 @@ const OrderListNotChildrent = () => {
     orderId: "",
     refund: "",
     payment: "",
+    note: ""
   });
 
   const handleSearch = (
