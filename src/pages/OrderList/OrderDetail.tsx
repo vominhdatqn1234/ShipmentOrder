@@ -67,6 +67,7 @@ const OrderDetail = ({ orderDetail: orderDetailProp }: any) => {
     orderId: "",
     refund: "",
     payment: "",
+    note: ""
   });
 
   const handleSearch = (
