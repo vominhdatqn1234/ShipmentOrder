@@ -328,7 +328,7 @@ export default function EditOrder({
             label="Tracking Number"
             valuePropName="value"
           >
-            <InputNumber
+            <Input
               style={{ width: "100%" }}
               placeholder="Tracking Number"
             />
