@@ -23,7 +23,7 @@ const RangePickerOrder: React.FC = () => {
   // const [value, setValue] = useState<RangeValue>(null);
   const [dates, setDates] = useState<RangeValue>(null);
   const [value, setValue] = useState<any>(null);
-  const { setOrders } = useOrderSlice();
+  const { setOrders, setNewTerm, setSearch } = useOrderSlice();
   // const onOpenChange = (open: boolean) => {
   //   if (open) {
   //     setDates([null, null]);
@@ -91,6 +91,8 @@ const RangePickerOrder: React.FC = () => {
       format={dateFormat}
       onChange={(val: any) => {
         setValue(val);
+        setNewTerm('')
+        setSearch([])
       }}
     />
 
