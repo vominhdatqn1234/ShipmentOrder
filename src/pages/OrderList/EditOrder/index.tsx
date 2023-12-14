@@ -331,9 +331,6 @@ export default function EditOrder({
             <InputNumber
               style={{ width: "100%" }}
               placeholder="Tracking Number"
-              formatter={(value) =>
-                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-              }
             />
           </FormItem>
           <FormItem
