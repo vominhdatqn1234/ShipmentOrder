@@ -257,6 +257,26 @@ const ProductsType = ({ orderDetail }: any) => {
       },
     },
     {
+      title: "Tổng 1 mặt",
+      dataIndex: "priceOneSide",
+      key: "totalPriceOneSide",
+      sorter: (a, b) => a.priceOneSide.localeCompare(b.priceOneSide),
+      sortDirections: ["descend", "ascend"],
+      render: (text: string, record) => {
+        return <p>{parseFloat(`${parseFloat(text) + parseFloat(record?.shipPrice)}`).toFixed(2)} $</p>;
+      },
+    },
+    {
+      title: "Tổng 2 mặt",
+      dataIndex: "priceTwoSides",
+      key: "totalPriceTwoSides",
+      sorter: (a, b) => a.priceOneSide.localeCompare(b.priceOneSide),
+      sortDirections: ["descend", "ascend"],
+      render: (text: string, record) => {
+        return <p>{parseFloat(`${parseFloat(text) + parseFloat(record?.shipPrice)}`).toFixed(2)} $</p>;
+      },
+    },
+    {
       title: "Chỉnh sửa",
       dataIndex: "",
       key: "x",
