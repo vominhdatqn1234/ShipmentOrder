@@ -80,6 +80,7 @@ const OrderList = () => {
     orderId: "",
     refund: "",
     payment: "",
+    note: "",
   });
 
   const handleSearch = (
@@ -334,16 +335,16 @@ const OrderList = () => {
         return <p>{`${text ? `${text} $` : "--"}`}</p>;
       },
     },
-    {
-      title: "Pay",
-      dataIndex: "payment",
-      key: "payment",
-      sorter: (a, b) => a.payment.localeCompare(b.payment),
-      sortDirections: ["descend", "ascend"],
-      render: (text: string) => {
-        return <p>{`${text ? `${text} $` : "--"}`}</p>;
-      },
-    },
+    // {
+    //   title: "Pay",
+    //   dataIndex: "payment",
+    //   key: "payment",
+    //   sorter: (a, b) => a.payment.localeCompare(b.payment),
+    //   sortDirections: ["descend", "ascend"],
+    //   render: (text: string) => {
+    //     return <p>{`${text ? `${text} $` : "--"}`}</p>;
+    //   },
+    // },
     // {
     //   title: "Phone",
     //   dataIndex: "phone",
@@ -365,9 +366,16 @@ const OrderList = () => {
       title: "Tracking",
       dataIndex: "tracking",
       key: "tracking",
+      width: '18%',
       render: (text: string) => {
         return <p>{text || "--"}</p>;
       },
+    },
+    {
+      title: "Note",
+      dataIndex: "note",
+      key: "note",
+      width: '12%',
     },
     // {
     //   title: "Action",
@@ -480,7 +488,7 @@ const OrderList = () => {
       </div>
     );
   }
-  console.log("search", search);
+
   return (
     <div className="m-6 p-2 md:p-4 bg-white rounded-3xl">
       <div className="flex justify-between py-4">
