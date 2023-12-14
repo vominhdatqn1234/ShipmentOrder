@@ -21,11 +21,13 @@ export default function SearchOrderId() {
     try {
       const ref = query(
         collection(firestore, "searchOrders"),
-        where("partnerOrderId", ">=", parseInt(keyword)),
+        where("partnerOrderId", "==", keyword),
         limit(1)
       );
+
       const querySnapshot = await getDocs(ref);
       querySnapshot.forEach(async (doc) => {
+
         const itemName = doc.data().partnerOrderId;
         if (isCloseEnough(`${itemName}`, `${keyword}`)) {
           const orderRef = query(
@@ -36,8 +38,9 @@ export default function SearchOrderId() {
           );
           const queryOrderSnapshot = await getDocs(orderRef);
           queryOrderSnapshot.forEach((orderDoc) => {
+
             const isExistOrderId = find(orderDoc.data()?.orders, {
-              partnerOrderId: +keyword,
+              partnerOrderId: doc?.data()?.partnerOrderId,
             });
 
             setSearch([
@@ -64,7 +67,7 @@ export default function SearchOrderId() {
     // if (newSearchTerm.length === 0) {
     //   setSearch(orders);
     // }
-    if (newSearchTerm.length >= 6) {
+    if (newSearchTerm.length >= 4) {
       debouncedSearch(newSearchTerm);
     }
   };
