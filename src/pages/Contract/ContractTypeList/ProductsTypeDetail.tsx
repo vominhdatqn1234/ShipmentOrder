@@ -315,7 +315,9 @@ const ProductsType = ({ orderDetail }: any) => {
   const sortingOrder: any = {
     "T-Shirt": 1,
     Sweatshirt: 2,
+    sweatshirt: 2,
     Hoodie: 3,
+    hoodie: 3,
     S: 1,
     M: 2,
     L: 3,
@@ -324,6 +326,9 @@ const ProductsType = ({ orderDetail }: any) => {
     "3XL": 6,
     "4XL": 7,
     "5XL": 8,
+    'T-shirt': 1,
+    't-shirt': 1,
+    'shirt': 1,
   };
   const sortedProducts = sortBy(productTypeData, [
     (product) => sortingOrder[product.name],
