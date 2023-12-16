@@ -97,7 +97,7 @@ export default function EditContractType({
           const payload: ProductType = {
             ...data,
           };
-          console.log('payloadpayloadpayload', payload)
+
           const updatedEmployeeArray = produce(
             parentEmployee?.productTypes,
             (productType: any) => {

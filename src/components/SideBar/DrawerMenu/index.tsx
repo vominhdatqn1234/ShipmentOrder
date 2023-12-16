@@ -158,8 +158,17 @@ const DrawerMenu: ForwardRefRenderFunction<DrawerMenuRef, DrawerProps> = (
       "pages",
       null,
       [
+        isAdmin ?  getItem("Chi Phí", "revenue", <GiTeamIdea />, [
+          getItem(
+            "Danh sách chi phí",
+            "total-revenue-list",
+            <GiTeamIdea />
+          ),
+          getItem("Tạo chi phí", "create-total-revenue", <HiUserPlus />),
+        ]) : null,
         employeesItem,
         contractItem,
+      
         // getItem(
         //   <div className="flex justify-between items-center">
         //     <p>Khách hàng</p>

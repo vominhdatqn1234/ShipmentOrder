@@ -86,6 +86,12 @@ const WeddingDayReportage = Loadable(
 const WeddingDressPage = Loadable(
   lazy(() => import("../pages/ManagerPage/WeddingDressPage"))
 );
+const TotalRevenueList = Loadable(
+  lazy(() => import("../components/Chart/BarChart/TotalRevenueList"))
+);
+const CreateTotalRevenue = Loadable(
+  lazy(() => import("../components/Chart/BarChart/CreateTotalRevenue/index"))
+);
 
 const managerPage = [
   {
@@ -169,6 +175,18 @@ const childrenAdmin = [
     name: "CreateContractType",
     exact: true,
     element: <CreateContractType />,
+  },
+  {
+    path: "/total-revenue-list",
+    name: "ToTalRevenue",
+    exact: true,
+    element: <TotalRevenueList />,
+  },
+  {
+    path: "/create-total-revenue",
+    name: "CreateToTalRevenue",
+    exact: true,
+    element: <CreateTotalRevenue />,
   },
   // {
   //   path: "/services-arising-list",

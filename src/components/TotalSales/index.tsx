@@ -76,6 +76,26 @@ export default function TotalSales() {
       offsetY: 0,
       height: 230,
     },
+    plotOptions: {
+      pie: {
+        customScale: 0.8, // Adjust the size of the donut
+        donut: {
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total",
+              formatter: function (w: any) {
+                return (
+                  w.globals.seriesTotals
+                    .reduce((a: any, b: any) => a + b, 0).toFixed?.(2)
+                );
+              },
+            },
+          },
+        },
+      },
+    },
     tooltip: {
       theme: "dark",
       fillSeriesColor: false,

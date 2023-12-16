@@ -119,8 +119,17 @@ const SideBar: React.FC = () => {
       "pages",
       null,
       [
+       isAdmin ?  getItem("Chi Phí", "revenue", <GiTeamIdea />, [
+        getItem(
+          "Danh sách chi phí",
+          "total-revenue-list",
+          <GiTeamIdea />
+        ),
+        getItem("Tạo chi phí", "create-total-revenue", <HiUserPlus />),
+      ]) : null,
         employeesItem,
         contractItem,
+        
         // getItem("Váy Cưới", "wedding-dress", <GiAmpleDress />, [
         //   getItem("Danh sách váy cưới", "wedding-dress-list", <GiSaddle />),
         //   getItem("Tạo váy cưới", "create-wedding-dress", <MdAssignmentAdd />),
@@ -135,14 +144,7 @@ const SideBar: React.FC = () => {
         //     <MdAssignmentAdd />
         //   ),
         // ]),
-        // getItem("Quản lý thành viên", "manage-team", <GiTeamIdea />, [
-        //   getItem(
-        //     "Danh sách thành viên",
-        //     "team-management-list",
-        //     <GiTeamIdea />
-        //   ),
-        //   getItem("Tạo thành viên", "create-team-management", <HiUserPlus />),
-        // ]),
+      
         // getItem("Bảng giá", "price-wedding", <GiAmpleDress />, [
         //   getItem("Danh sách bảng giá", "price-wedding-list", <GiSaddle />),
         //   getItem("Tạo bảng giá", "create-price-wedding", <MdAssignmentAdd />),
