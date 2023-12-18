@@ -272,14 +272,12 @@ const OrderList = () => {
       key: "partnerOrderId",
       ...getColumnSearchProps("partnerOrderId", "phone"),
     },
-    // {
-    //   title: "Khách hàng",
-    //   dataIndex: "name",
-    //   key: "name",
-    //   sorter: (a, b) => a.name.localeCompare(b.name),
-    //   sortDirections: ["descend", "ascend"],
-    //   ...getColumnSearchProps("name", "phone"),
-    // },
+    {
+      title: "Khách hàng",
+      dataIndex: "createdUserName",
+      key: "createdUserName",
+      sortDirections: ["descend", "ascend"],
+    },
     {
       title: "Address",
       dataIndex: "address",
