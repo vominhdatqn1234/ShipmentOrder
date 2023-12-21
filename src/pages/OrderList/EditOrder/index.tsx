@@ -81,6 +81,20 @@ export default function EditOrder({
       payment: defaultValues?.payment,
       note: defaultValues?.note
     });
+    setValue('id', defaultValues.id)
+    setValue('partnerOrderId', defaultValues.partnerOrderId)
+    setValue('name', defaultValues.name)
+    setValue('phone', defaultValues.phone)
+    setValue('address', defaultValues.address)
+    setValue('price', defaultValues.price)
+    setValue('total', defaultValues.total)
+    setValue('status', defaultValues.status)
+    setValue('created', defaultValues.created)
+    setValue('quantity', defaultValues.quantity)
+    setValue('tracking', defaultValues.tracking)
+    setValue('refund', defaultValues.refund)
+    setValue('payment', defaultValues.payment)
+    setValue('note', defaultValues.note)
   }, [defaultValues, form]);
 
   return (
