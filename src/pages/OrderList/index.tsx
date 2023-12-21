@@ -52,6 +52,7 @@ const OrderList = () => {
   const {
     orders: orderData,
     removeOrderId,
+    removeSearchOrderId,
     isLoading,
     newTerm,
     search,
@@ -129,6 +130,7 @@ const OrderList = () => {
     await updateDoc(docRef, {
       orders: updatedOrdersArray,
     });
+    removeSearchOrderId((record as any)?.orderId);
     removeOrderId((record as any)?.orderId);
   };
   const handleShowDetail = (record: OrdersModel) => async () => {
@@ -364,7 +366,7 @@ const OrderList = () => {
       title: "Tracking",
       dataIndex: "tracking",
       key: "tracking",
-      width: '18%',
+      width: "18%",
       render: (text: string) => {
         return <p>{text || "--"}</p>;
       },
@@ -373,7 +375,7 @@ const OrderList = () => {
       title: "Note",
       dataIndex: "note",
       key: "note",
-      width: '12%',
+      width: "12%",
     },
     // {
     //   title: "Action",
