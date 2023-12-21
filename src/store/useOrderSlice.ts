@@ -15,6 +15,7 @@ interface OrderSlice {
   updateOrderId: (orderId: string, orders: any) => void;
   updateSearchOrderId: (orderId: string, orders: any) => void;
   removeOrderId: (orderId: string) => void;
+  removeSearchOrderId: (orderId: string) => void;
 }
 
 const createOrderSlice: StateCreator<
@@ -89,6 +90,16 @@ const createOrderSlice: StateCreator<
           (el: any) => el.orderId === orderId
         );
         item.orders.splice(orderIndex, 1);
+      })
+    ),
+    removeSearchOrderId: (orderId: string) =>
+    set(
+      produce((item) => {
+        const orderIndex = item.search.findIndex(
+          // (el: any) => el.id === orderId
+          (el: any) => el.orderId === orderId
+        );
+        item.search.splice(orderIndex, 1);
       })
     ),
 }));
