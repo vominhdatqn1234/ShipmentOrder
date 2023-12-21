@@ -7,7 +7,8 @@ import { useOrderSlice } from "../../store/useOrderSlice";
 
 export default function SearchOrderId() {
   const [loading, setLoading] = useState(false);
-  const { setNewTerm, setSearch } = useOrderSlice();
+  const { setNewTerm, setSearch, newTerm } = useOrderSlice();
+  const [errorMessage, setErrorMessage] = useState('')
 
   const isCloseEnough = (str1: string, str2: string) => {
     return str1?.includes?.(str2) || str2?.includes?.(str1);
@@ -81,9 +82,10 @@ export default function SearchOrderId() {
   const handleChangeValue = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newSearchTerm = event.target.value;
     setNewTerm(newSearchTerm);
-
-    if (newSearchTerm.length >= 4) {
+    setErrorMessage('Vui lòng nhập 7 ký tự trở lên')
+    if (newSearchTerm.length >= 7) {
       debouncedSearch(newSearchTerm);
+      setErrorMessage('')
     }
   };
 
@@ -95,7 +97,9 @@ export default function SearchOrderId() {
         enterButton
         allowClear
         loading={loading}
+        status={errorMessage.length > 0 && newTerm.length > 0 ? 'error' : undefined}
       />
+      {errorMessage.length > 0 && newTerm.length > 0 && <div className="mt-2 text-base text-red-600">{errorMessage}</div>}
     </div>
   );
 }
