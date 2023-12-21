@@ -60,7 +60,7 @@ export default function EditOrder({
   const [form] = FormAntDeisgn.useForm();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
-  const { orders, updateOrderId } = useOrderSlice();
+  const { orders, updateOrderId, newTerm, updateSearchOrderId } = useOrderSlice();
   const contractRef = collection(firestore, "orders");
   // const queryClient = useQueryClient();
   const { user } = useUser();
@@ -227,7 +227,12 @@ export default function EditOrder({
               }
             }
           ) : [];
-          updateOrderId(defaultValues.orderId, payload);
+          if (newTerm.length >= 4) {
+            updateSearchOrderId(defaultValues.orderId, payload);
+          } else {
+            updateOrderId(defaultValues.orderId, payload);
+          }
+          
           const docRef = doc(contractRef,(defaultValues as any)?.parentId);
           await updateDoc(docRef, {
             orders: map(updatedOrdersArray, (order) => omit(order, "orders")),
