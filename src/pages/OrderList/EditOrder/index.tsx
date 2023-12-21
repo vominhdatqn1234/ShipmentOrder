@@ -1,38 +1,24 @@
-import { InboxOutlined } from "@ant-design/icons";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
   Button,
-  DatePicker,
   Form as FormAntDeisgn,
   Input,
   InputNumber,
   Upload,
-  UploadProps,
-  message,
+  message
 } from "antd";
 import type { FormInstance } from "antd/es/form";
 import dayjs from "dayjs";
 import { collection, doc, updateDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { produce } from "immer";
 import { isEmpty, map, omit } from "lodash";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useQueryClient } from "react-query";
-import { v4 as uuidv4 } from "uuid";
 import * as yup from "yup";
 import { FormItem } from "../../../components/Form";
-import { cn } from "../../../lib/cs";
-import { firestore, storage } from "../../../lib/firebase";
-import { ContractModel } from "../../../models";
-import { useUser } from "../../../store/useUser";
-import { isVietnamesePhoneNumber } from "../../../utils";
+import { firestore } from "../../../lib/firebase";
 import { OrdersModel } from "../../../models/OrdersModel";
 import { useOrderSlice } from "../../../store/useOrderSlice";
-import { produce } from "immer";
-const { Dragger } = Upload;
-
-const currentDate = dayjs();
-const dateFormat = "DD-MM-YYYY";
 
 const schema = yup
   .object({
@@ -60,16 +46,8 @@ export default function EditOrder({
   const [form] = FormAntDeisgn.useForm();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
-  const { orders, updateOrderId, newTerm, updateSearchOrderId } = useOrderSlice();
+  const { updateOrderId, newTerm, updateSearchOrderId } = useOrderSlice();
   const contractRef = collection(firestore, "orders");
-  // const queryClient = useQueryClient();
-  const { user } = useUser();
-  const isAdmin = user?.permission === "Admin";
-
-  // const [fileList, setFileList] = useState<any[]>(
-  //   (defaultValues as any).files || []
-  // );
-  const uuId = uuidv4();
 
   const {
     control,
@@ -105,89 +83,6 @@ export default function EditOrder({
     });
   }, [defaultValues, form]);
 
-  // const handleUpload = async (info: any) => {
-  //   if (info.file.status === "done") {
-  //     setFileList([
-  //       {
-  //         id: uuId,
-  //         url: info.file.url,
-  //         name: info.file.name,
-  //       },
-  //     ]);
-  //     setValue("files", [
-  //       {
-  //         id: uuId,
-  //         url: info.file.url,
-  //         name: info.file.name,
-  //       },
-  //     ]);
-  //     message.success(`${info.file.name} file uploaded successfully`);
-  //   } else if (info.file.status === "error") {
-  //     message.error(`${info.file.name} file upload failed.`);
-  //   }
-  // };
-
-  // const customRequest = async ({ file, onSuccess, onError }: any) => {
-  //   try {
-  //     const storageRef = ref(storage, `/files/${file.name}`);
-
-  //     const uploadTask = uploadBytesResumable(storageRef, file);
-
-  //     uploadTask.on(
-  //       "state_changed",
-  //       (snapshot) => {
-  //         const percent = Math.round(
-  //           (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-  //         );
-
-  //         // update progress
-  //         // setPercent(percent);
-  //       },
-  //       (err) => console.log(err),
-  //       () => {
-  //         // download url
-  //         getDownloadURL(uploadTask.snapshot.ref).then((url) => {
-  //           onSuccess();
-  //           handleUpload({
-  //             file: {
-  //               status: "done",
-  //               name: file.name,
-  //               url,
-  //             },
-  //           });
-  //         });
-  //       }
-  //     );
-  //   } catch (error) {
-  //     console.error("Error uploading file:", error);
-  //     onError();
-  //   }
-  // };
-  // const handleChange: UploadProps["onChange"] = ({ fileList: newFileList }) => {
-  //   if (fileList.length > 0) {
-  //     const matchingUrls = fileList?.reduce((result: any, image: any) => {
-  //       if (newFileList.some((file: any) => image?.id?.includes(file?.id))) {
-  //         result.push(image);
-  //       }
-  //       return result;
-  //     }, []);
-  //     setFileList(matchingUrls);
-  //     setValue("contractImage", matchingUrls);
-  //   }
-  // };
-  // const props: UploadProps = {
-  //   name: "file",
-  //   multiple: true,
-  //   listType: "picture",
-  //   // beforeUpload,
-  //   customRequest,
-  //   onChange: handleChange,
-  //   fileList,
-  //   onDrop(e) {
-  //     console.log("Dropped files", e.dataTransfer.files);
-  //   },
-  // };
-
   return (
     <>
       {contextHolder}
@@ -202,7 +97,6 @@ export default function EditOrder({
             +data?.quantity === 2 ? 3 : +data?.quantity === 3 ? 6 : 0;
           const payload: OrdersModel = {
             ...data,
-            // files: fileList,
             total: `${parseFloat(
               `${
                 +data?.quantity * parseFloat(data?.price) +
@@ -258,9 +152,6 @@ export default function EditOrder({
           >
             <Input allowClear disabled placeholder="Nhập mã order của khách hàng" />
           </FormItem>
-          {/* <FormItem control={control} name="name" label="Tên khách hàng">
-            <Input allowClear placeholder="Nhập tên khách hàng" />
-          </FormItem> */}
           <FormItem
             control={control}
             name="payment"
@@ -345,40 +236,7 @@ export default function EditOrder({
           >
             <Input.TextArea placeholder="Nhập ghi chú" />
           </FormItem>
-          {/* <FormItem control={control} name="created" label="Ngày ngày tạo">
-            <DatePicker
-              format={dateFormat}
-              placeholder="Vui lòng chọn ngày ngày tạo"
-              style={{ width: "100%" }}
-            />
-          </FormItem> */}
         </div>
-        {/* <div className="py-6">
-          <FormItem
-            control={control}
-            name="files"
-            // valuePropName='fileList'
-            label="Upload file "
-          >
-            <Dragger {...props}>
-              <p className="ant-upload-drag-icon">
-                <InboxOutlined />
-              </p>
-              <p className="ant-upload-text">
-                Nhấp hoặc kéo tệp vào khu vực này để tải lên
-              </p>
-              <p className="ant-upload-hint">
-                Hỗ trợ tải lên một lần hoặc hàng loạt. Nghiêm cấm tải lên dữ
-                liệu công ty hoặc các thông tin khác
-              </p>
-            </Dragger>
-          </FormItem>
-        </div> */}
-        {/* <div className="pb-20 ">
-          <FormItem control={control} name="notes" label="Ghi chú">
-            <Editor />
-          </FormItem>
-        </div> */}
         <Button
           loading={loading}
           disabled={!isEmpty(errors)}
