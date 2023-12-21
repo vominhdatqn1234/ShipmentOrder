@@ -22,8 +22,8 @@ export default function SearchOrderId() {
       const ref = query(
         collection(firestore, "searchOrders"),
         where("partnerOrderId", ">=", keyword),
-        where("partnerOrderId", "<", keyword + "\uf8ff")
-        // limit(3)
+        where("partnerOrderId", "<", keyword + "\uf8ff"),
+        limit(10)
       );
 
       const querySnapshot = await getDocs(ref);
