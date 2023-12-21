@@ -1,14 +1,13 @@
 import Search from "antd/es/input/Search";
 import React, { useState } from "react";
-import { debounce, find, map } from "lodash";
+import { debounce, filter, find, isEmpty } from "lodash";
 import { collection, query, where, limit, getDocs } from "firebase/firestore";
 import { firestore } from "../../lib/firebase";
 import { useOrderSlice } from "../../store/useOrderSlice";
 
 export default function SearchOrderId() {
-  // const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
-  const { setNewTerm, setSearch, orders } = useOrderSlice();
+  const { setNewTerm, setSearch } = useOrderSlice();
 
   const isCloseEnough = (str1: string, str2: string) => {
     return str1?.includes?.(str2) || str2?.includes?.(str1);
@@ -21,38 +20,57 @@ export default function SearchOrderId() {
     try {
       const ref = query(
         collection(firestore, "searchOrders"),
-        where("partnerOrderId", "==", keyword),
-        limit(1)
+        where("partnerOrderId", ">=", keyword),
+        where("partnerOrderId", "<", keyword + "\uf8ff")
+        // limit(3)
       );
 
       const querySnapshot = await getDocs(ref);
+      let resultSearch: any = [];
+      let resultSearchOrder: any = [];
+      let promiseOrder: any = [];
       querySnapshot.forEach(async (doc) => {
-
-        const itemName = doc.data().partnerOrderId;
-        if (isCloseEnough(`${itemName}`, `${keyword}`)) {
-          const orderRef = query(
-            collection(firestore, "orders"),
-            where("createdUser", "==", doc.data()?.userId),
-            where("created", "==", doc.data()?.created),
-            limit(1)
-          );
-          const queryOrderSnapshot = await getDocs(orderRef);
-          queryOrderSnapshot.forEach((orderDoc) => {
-
-            const isExistOrderId = find(orderDoc.data()?.orders, {
-              partnerOrderId: doc?.data()?.partnerOrderId,
-            });
-
-            setSearch([
-              {
-                ...isExistOrderId,
-                orders: orderDoc.data()?.orders,
-                parentId: orderDoc.id,
-              },
-            ]);
-          });
-        }
+        resultSearch.push({
+          id: doc.id,
+          ...doc.data(),
+        });
       });
+      resultSearch.forEach((order: any, index: number) => {
+        promiseOrder.push(
+          new Promise(async (resolve, reject) => {
+            try {
+              const orderRef = query(
+                collection(firestore, "orders"),
+                where("createdUser", "==", order?.userId),
+                where("created", "==", order.created),
+                limit(1)
+              );
+              const queryOrderSnapshot = await getDocs(orderRef);
+              queryOrderSnapshot.forEach((orderDoc) => {
+                const isExistOrderId = find(orderDoc.data()?.orders, {
+                  partnerOrderId: order?.partnerOrderId,
+                });
+                if (isExistOrderId) {
+                  const payload = {
+                    ...isExistOrderId,
+                    orders: orderDoc.data()?.orders,
+                    parentId: orderDoc.id,
+                  };
+                  resultSearchOrder.push(payload);
+                  resolve(payload);
+                } else {
+                  resolve({});
+                }
+              });
+            } catch (error) {
+              reject(error);
+            }
+          })
+        );
+      });
+      const orderPromiseAll = await Promise.all(promiseOrder);
+      const results = filter(orderPromiseAll, item => !isEmpty(item))
+      setSearch(results);
     } catch (error) {
     } finally {
       setLoading(false);
@@ -63,10 +81,7 @@ export default function SearchOrderId() {
   const handleChangeValue = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newSearchTerm = event.target.value;
     setNewTerm(newSearchTerm);
-    // setSearchTerm(newSearchTerm);
-    // if (newSearchTerm.length === 0) {
-    //   setSearch(orders);
-    // }
+
     if (newSearchTerm.length >= 4) {
       debouncedSearch(newSearchTerm);
     }
