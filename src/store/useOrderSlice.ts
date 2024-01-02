@@ -16,6 +16,19 @@ interface OrderSlice {
   updateSearchOrderId: (orderId: string, orders: any) => void;
   removeOrderId: (orderId: string) => void;
   removeSearchOrderId: (orderId: string) => void;
+  reset: () => void;
+}
+type State = {
+  search: []
+  newTerm: string
+  orders: []
+}
+
+// define the initial state
+const initialState: State = {
+  search: [],
+  newTerm: "",
+  orders: []
 }
 
 const createOrderSlice: StateCreator<
@@ -24,8 +37,11 @@ const createOrderSlice: StateCreator<
   [["zustand/immer", never]],
   OrderSlice
 > = immer((set) => ({
-  search: [],
-  newTerm: "",
+  ...initialState,
+  isLoading: true,
+  reset: () => {
+    set(initialState)
+  },
   setNewTerm: (u) =>
     set((state) => {
       state.newTerm = u;
@@ -34,12 +50,12 @@ const createOrderSlice: StateCreator<
     set((state) => {
       state.search = u;
     }),
-  orders: [],
+  
   setOrders: (u) =>
     set((state) => {
       state.orders = u;
     }),
-  isLoading: true,
+ 
   setIsLoading: (isLoading: boolean) =>
     set((state) => {
       state.isLoading = isLoading;
