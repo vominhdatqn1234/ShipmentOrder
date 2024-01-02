@@ -4,9 +4,11 @@ import { debounce, filter, find, isEmpty } from "lodash";
 import { collection, query, where, limit, getDocs } from "firebase/firestore";
 import { firestore } from "../../lib/firebase";
 import { useOrderSlice } from "../../store/useOrderSlice";
+import { useUser } from "../../store/useUser";
 
 export default function SearchOrderId() {
   const [loading, setLoading] = useState(false);
+  const { user } = useUser()
   const { setNewTerm, setSearch, newTerm } = useOrderSlice();
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -22,8 +24,8 @@ export default function SearchOrderId() {
       const ref = query(
         collection(firestore, "searchOrders"),
         where("partnerOrderId", ">=", keyword),
-        where("partnerOrderId", "<", keyword + "\uf8ff"),
-        limit(10)
+        where("partnerOrderId", "<", keyword + "\uf8ff")
+        // limit(3)
       );
 
       const querySnapshot = await getDocs(ref);
@@ -31,11 +33,20 @@ export default function SearchOrderId() {
       let resultSearchOrder: any = [];
       let promiseOrder: any = [];
       querySnapshot.forEach(async (doc) => {
-        resultSearch.push({
-          id: doc.id,
-          ...doc.data(),
-        });
+        if (user?.permission === 'Admin') {
+          resultSearch.push({
+            id: doc.id,
+            ...doc.data(),
+          });
+        } else if (user?.id === doc.data()?.userId) {
+          resultSearch.push({
+            id: doc.id,
+            ...doc.data(),
+          });
+        }
+       
       });
+      
       resultSearch.forEach((order: any, index: number) => {
         promiseOrder.push(
           new Promise(async (resolve, reject) => {
