@@ -21,10 +21,12 @@ import useWindowSize from "../../hooks/useWindowSize";
 import { useWindowSizeMenu } from "../../store/useWindowSizeMenu";
 import { cn } from "../../lib/cs";
 import { useOrders } from "../../pages/OrderList/useOrders";
+import { useOrderSlice } from "../../store/useOrderSlice";
 
 const Navbar = () => {
   const { user, setUser } = useUser();
   const { refetch } = useOrders();
+  const { reset } = useOrderSlice()
   const [token, setToken] = useLocalStorage("token", null);
   const { name, avatar } = user || {};
   const navigate = useNavigate();
@@ -37,6 +39,7 @@ const Navbar = () => {
     setToken(null);
     navigate("/login");
     refetch?.();
+    reset()
   };
   const items: MenuProps["items"] = [
     {
