@@ -8,7 +8,7 @@ import ColorButton from "../../../components/ColorButton";
 import { colors } from "../../../styles/colors";
 import { FaEdit } from "react-icons/fa";
 import { MdDeleteForever } from "react-icons/md";
-import { QuestionCircleOutlined, FileAddOutlined } from "@ant-design/icons";
+import { QuestionCircleOutlined, FileAddOutlined, TrophyFilled } from "@ant-design/icons";
 import { collection, deleteDoc, doc } from "firebase/firestore";
 import { firestore } from "../../../lib/firebase";
 import EditEmployee from "../EditEmployee";
@@ -18,6 +18,7 @@ import { useEmployeesHook } from "./useEmployeeHook";
 import { useEmployeeSlice } from "../../../store/useEmployeeSlice";
 import { find } from "lodash";
 import { produce } from "immer";
+import OrderListEmployee from "../OrderListEmployee";
 
 // const defaultValues = {
 // 	name: '',
@@ -31,6 +32,7 @@ import { produce } from "immer";
 export default function EmployeeList() {
   const [opened, setOpened] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const [showOrders, setShowOrders] = useState(false);
   const [orderDetail, setOrderDetail] = useState<any>({});
   const [defaultValues, setDefaultValues] = useState<EmployeeModel>({
     id: "",
@@ -64,6 +66,15 @@ export default function EmployeeList() {
   const handleShowDetail = (record: EmployeeModel) => () => {
     setShowDetail(true);
     setOrderDetail(record?.id);
+  };
+
+  const handleShowOrders = (record: EmployeeModel) => () => {
+    setShowOrders(true);
+    setOrderDetail(record?.id);
+  };
+
+  const handleCancelOrders = () => {
+    setShowOrders(false);
   };
 
   const handleCancelDetail = () => {
@@ -162,13 +173,22 @@ export default function EmployeeList() {
       key: "x",
       render: (text, record) => (
         <div className="flex items-center gap-2">
+          <Tooltip title="Xem danh sách loại sản phẩm">
+            <ColorButton
+              override={colors.primary}
+              type="primary"
+              size="small"
+              icon={<TrophyFilled />}
+              onClick={handleShowDetail(record)}
+            />
+          </Tooltip>
           <Tooltip title="Xem danh sách hóa đơn">
             <ColorButton
               override={colors.primary}
               type="primary"
               size="small"
               icon={<FileAddOutlined />}
-              onClick={handleShowDetail(record)}
+              onClick={handleShowOrders(record)}
             />
           </Tooltip>
           <Tooltip title="Chỉnh sửa">
@@ -245,6 +265,16 @@ export default function EmployeeList() {
           handleCancel={handleCancel}
           refetch={refetchTeam}
         /> */}
+      </Modal>
+      <Modal
+        title="Cập nhật cập danh sách sản phẩm"
+        open={showOrders}
+        footer={null}
+        width={1280}
+        onCancel={handleCancelOrders}
+        bodyStyle={{ overflowY: "scroll", height: "calc(100vh - 250px)" }}
+      >
+        <OrderListEmployee userId={orderDetail} />
       </Modal>
     </div>
   );
