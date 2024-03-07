@@ -220,8 +220,8 @@ export default function CreateOrderForm() {
             ? "T-Shirt"
             : item["Type"];
           const isExistItem = find(mapProductType as any, {
-            name: lowerCase(itemType),
-            size: item["Size"],
+            name: lowerCase(itemType)?.trim(),
+            size: `${item["Size"]}`.trim(),
           });
 
           const quantity = !isNull(item["Quantity"])
