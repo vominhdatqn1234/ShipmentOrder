@@ -23,15 +23,15 @@ import { getStorage } from "firebase/storage";
 //     appId: "1:419705901043:web:1ea4de96beced676fdcc86",
 //     measurementId: "G-Y1RS3QJ9G7"
 //   };
-// const firebaseConfig = {
-//   apiKey: "AIzaSyDpuVkE-v1ay3_-zLCl9MCkktPn_xpUQSs",
-//   authDomain: "shipmentinfomation.firebaseapp.com",
-//   projectId: "shipmentinfomation",
-//   storageBucket: "shipmentinfomation.appspot.com",
-//   messagingSenderId: "337968647992",
-//   appId: "1:337968647992:web:b01ccb9f5c19042d793bcd",
-//   measurementId: "G-BTTHG813WD"
-// };
+const firebaseConfig = {
+  apiKey: "AIzaSyDpuVkE-v1ay3_-zLCl9MCkktPn_xpUQSs",
+  authDomain: "shipmentinfomation.firebaseapp.com",
+  projectId: "shipmentinfomation",
+  storageBucket: "shipmentinfomation.appspot.com",
+  messagingSenderId: "337968647992",
+  appId: "1:337968647992:web:b01ccb9f5c19042d793bcd",
+  measurementId: "G-BTTHG813WD"
+};
 // const firebaseConfig = {
 //   apiKey: "AIzaSyCScj_PXo5qzgazwseJPs47ro8BpbS0y84",
 //   authDomain: "roxanatech-b4c96.firebaseapp.com",
@@ -42,15 +42,15 @@ import { getStorage } from "firebase/storage";
 //   measurementId: "G-XN9H65LF3W"
 // };
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAqdGJYii3M3jlVT6SCQk1YGoBPKWaacRw",
-  authDomain: "teement-a3041.firebaseapp.com",
-  projectId: "teement-a3041",
-  storageBucket: "teement-a3041.appspot.com",
-  messagingSenderId: "315622622914",
-  appId: "1:315622622914:web:a9db1f10570598ddc59d5b",
-  measurementId: "G-RR4NLJ2YX5"
-};
+// const firebaseConfig = {
+//   apiKey: "AIzaSyAqdGJYii3M3jlVT6SCQk1YGoBPKWaacRw",
+//   authDomain: "teement-a3041.firebaseapp.com",
+//   projectId: "teement-a3041",
+//   storageBucket: "teement-a3041.appspot.com",
+//   messagingSenderId: "315622622914",
+//   appId: "1:315622622914:web:a9db1f10570598ddc59d5b",
+//   measurementId: "G-RR4NLJ2YX5"
+// };
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
