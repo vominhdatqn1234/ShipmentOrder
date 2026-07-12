@@ -10,7 +10,7 @@ import { isEmpty } from "lodash";
 import ColorButton from "../../components/ColorButton";
 import { colors } from "../../styles/colors";
 import { MdDeleteForever } from "react-icons/md";
-import { collection, deleteDoc, doc } from "firebase/firestore";
+import { collection, deleteDoc, doc } from "lib/db";
 import { firestore } from "../../lib/firebase";
 
 const currentDate = dayjs();

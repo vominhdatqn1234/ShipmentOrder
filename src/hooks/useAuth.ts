@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocalStorage } from './useLocalStorage'
-import { collection, query, where, limit, getDocs } from 'firebase/firestore'
+import { collection, query, where, limit, getDocs } from 'lib/db'
 import { firestore } from '../lib/firebase'
 import { useUser } from '../store/useUser'
 

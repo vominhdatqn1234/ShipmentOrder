@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "lib/db";
 import { useEffect, useState } from "react";
 import { useOrderSlice } from "../../../store/useOrderSlice";
 // import { useUser } from "../../store/useUser";

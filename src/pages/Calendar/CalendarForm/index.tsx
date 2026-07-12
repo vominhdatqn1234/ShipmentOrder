@@ -39,7 +39,7 @@ import * as yup from 'yup';
 import dayjs, { Dayjs } from 'dayjs'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { isVietnamesePhoneNumber } from '../../../utils';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection } from 'lib/db';
 import { firestore } from '../../../lib/firebase';
 import { isEmpty } from 'lodash';
 

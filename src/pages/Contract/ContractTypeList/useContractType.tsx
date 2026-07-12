@@ -1,5 +1,5 @@
-import { useFirestoreQuery } from "@react-query-firebase/firestore";
-import { query, collection, orderBy } from "firebase/firestore";
+import { useFirestoreQuery } from "lib/queryHooks";
+import { query, collection, orderBy } from "lib/db";
 import { firestore } from "../../../lib/firebase";
 import { ContractType } from "../../../models/ContractModel";
 

@@ -31,7 +31,7 @@ import EditOrder from "./EditOrder";
 import EditOrderDetail from "./EditOrderDetail";
 import { find } from "lodash";
 import { produce } from "immer";
-import { collection, doc, updateDoc } from "firebase/firestore";
+import { collection, doc, updateDoc } from "lib/db";
 import { firestore } from "../../lib/firebase";
 
 type DataIndex = keyof OrdersModel;

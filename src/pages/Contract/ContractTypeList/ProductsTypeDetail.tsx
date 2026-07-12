@@ -23,7 +23,7 @@ import {
   getDocs,
   query,
   updateDoc,
-} from "firebase/firestore";
+} from "lib/db";
 import { useEffect, useRef, useState } from "react";
 import Highlighter from "react-highlight-words";
 import { FaEdit } from "react-icons/fa";

@@ -26,7 +26,7 @@ import { colors } from "../../../styles/colors";
 import { formatCurrency } from "../../../utils";
 import { WeddingDressModel } from "../../../models";
 import { useWeddingDress } from "./useWeddingDress";
-import { collection, doc, deleteDoc } from "firebase/firestore";
+import { collection, doc, deleteDoc } from "lib/db";
 import { firestore } from "../../../lib/firebase";
 import { map } from "lodash";
 import EditWeddingDress from "../EditWeddingDress";

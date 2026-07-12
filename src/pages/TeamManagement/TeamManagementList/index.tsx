@@ -9,7 +9,7 @@ import ColorButton from "../../../components/ColorButton";
 import { colors } from "../../../styles/colors";
 import { FaEdit } from "react-icons/fa";
 import { MdDeleteForever } from "react-icons/md";
-import { collection, deleteDoc, doc } from "firebase/firestore";
+import { collection, deleteDoc, doc } from "lib/db";
 import { firestore } from "../../../lib/firebase";
 import EditTeamManagement from "../EditTeamManagement";
 

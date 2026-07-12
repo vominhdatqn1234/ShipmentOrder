@@ -13,8 +13,8 @@ import {
 } from "antd";
 import type { FormInstance } from "antd/es/form";
 import Dragger from "antd/es/upload/Dragger";
-import { collection, doc, updateDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { collection, doc, updateDoc } from "lib/db";
+import { getDownloadURL, ref, uploadBytesResumable } from "lib/supastorage";
 import { assign, find, isEmpty, map } from "lodash";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "react-query";

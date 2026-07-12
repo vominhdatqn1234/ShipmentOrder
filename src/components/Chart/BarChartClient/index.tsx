@@ -13,7 +13,7 @@ import {
   Space,
   Tooltip,
 } from "antd";
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { collection, getDocs, limit, query, where } from "lib/db";
 import { firestore } from "../../../lib/firebase";
 import { toast } from "react-toastify";
 import { flatMap, map, reduce, sumBy } from "lodash";

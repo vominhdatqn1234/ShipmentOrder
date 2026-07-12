@@ -1,5 +1,5 @@
 import { Avatar, Tooltip } from "antd";
-import { collection, getDocs, query } from "firebase/firestore";
+import { collection, getDocs, query } from "lib/db";
 import { useEffect, useState } from "react";
 import { FaDollarSign } from "react-icons/fa";
 import { firestore } from "../../lib/firebase";

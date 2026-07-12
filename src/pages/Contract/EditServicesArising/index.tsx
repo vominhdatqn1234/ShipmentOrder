@@ -7,7 +7,7 @@ import {
   message,
 } from "antd";
 import type { FormInstance } from "antd/es/form";
-import { collection, doc, updateDoc } from "firebase/firestore";
+import { collection, doc, updateDoc } from "lib/db";
 import { isEmpty } from "lodash";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";

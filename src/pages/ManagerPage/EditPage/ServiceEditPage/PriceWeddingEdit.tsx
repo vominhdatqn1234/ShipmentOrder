@@ -14,14 +14,14 @@ import { isEmpty, map } from "lodash";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
 import { useQueryClient } from "react-query";
-import { collection, doc, updateDoc } from "firebase/firestore";
+import { collection, doc, updateDoc } from "lib/db";
 import { FormItem } from "../../../../components/Form";
 import { firestore, storage } from "../../../../lib/firebase";
 import { InboxOutlined } from "@ant-design/icons";
-import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
+import { useFirestoreCollectionMutation } from "lib/queryHooks";
 import Dragger from "antd/es/upload/Dragger";
 import { v4 as uuidv4 } from "uuid";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytesResumable } from "lib/supastorage";
 import { ContactPageModel } from "../../../../models/ContactPageModel";
 import WeddingAblumEditForm from "./WeddingAblumEditForm";
 

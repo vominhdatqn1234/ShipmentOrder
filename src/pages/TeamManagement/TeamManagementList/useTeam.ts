@@ -1,6 +1,6 @@
 import { firestore } from '../../../lib/firebase';
-import { useFirestoreQuery } from '@react-query-firebase/firestore';
-import { query, collection } from 'firebase/firestore';
+import { useFirestoreQuery } from 'lib/queryHooks';
+import { query, collection } from 'lib/db';
 
 export function useTeam() {
   const ref = query(collection(firestore, 'team'));

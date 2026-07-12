@@ -25,7 +25,7 @@ import Highlighter from "react-highlight-words";
 import { MdDeleteForever } from "react-icons/md";
 
 import dayjs from "dayjs";
-import { collection, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, updateDoc } from "lib/db";
 // import ColorButton from "../../components/ColorButton";
 import { firestore } from "../../../lib/firebase";
 import { colors } from "../../../styles/colors";

@@ -1,5 +1,5 @@
 import { yupResolver } from "@hookform/resolvers/yup";
-import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
+import { useFirestoreCollectionMutation } from "lib/queryHooks";
 import {
   Badge,
   Button,
@@ -11,7 +11,7 @@ import {
   message,
 } from "antd";
 import type { FormInstance } from "antd/es/form";
-import { collection, doc, getDocs, query, updateDoc } from "firebase/firestore";
+import { collection, doc, getDocs, query, updateDoc } from "lib/db";
 import { find, isEmpty, map } from "lodash";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";

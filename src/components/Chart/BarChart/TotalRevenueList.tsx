@@ -19,7 +19,7 @@ import { colors } from "../../../styles/colors";
 import { FaEdit } from "react-icons/fa";
 import { MdDeleteForever } from "react-icons/md";
 import { QuestionCircleOutlined } from "@ant-design/icons";
-import { collection, deleteDoc, doc } from "firebase/firestore";
+import { collection, deleteDoc, doc } from "lib/db";
 import { firestore } from "../../../lib/firebase";
 import dayjs from "dayjs";
 import { RevenueType } from "../../../models/Revenue";

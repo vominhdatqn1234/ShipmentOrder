@@ -4,7 +4,7 @@ import dayjs from "dayjs";
 import { PlusOutlined } from "@ant-design/icons";
 import { formatCurrency, formatNumber } from "../../../utils";
 import { Button, Divider, Input, InputRef, Select, Space, Tooltip } from "antd";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "lib/db";
 import { firestore } from "../../../lib/firebase";
 import { toast } from "react-toastify";
 

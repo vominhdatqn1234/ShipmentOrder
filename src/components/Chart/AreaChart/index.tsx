@@ -4,7 +4,7 @@ import { colors } from "../../../styles/colors";
 import { useContract } from "../../../pages/Contract/useContract";
 import dayjs from "dayjs";
 import { groupBy, keys, map, sumBy } from "lodash";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "lib/db";
 import { firestore } from "../../../lib/firebase";
 import { formatCurrency, formatNumber } from "../../../utils";
 import { Avatar } from "antd";

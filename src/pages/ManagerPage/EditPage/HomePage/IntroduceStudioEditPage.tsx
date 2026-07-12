@@ -6,11 +6,11 @@ import { isEmpty } from "lodash";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
 import { useQueryClient } from "react-query";
-import { collection, doc, updateDoc } from "firebase/firestore";
+import { collection, doc, updateDoc } from "lib/db";
 import { FormItem } from "../../../../components/Form";
 import { firestore } from "../../../../lib/firebase";
 import { HomePageModal } from "../../../../models";
-import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
+import { useFirestoreCollectionMutation } from "lib/queryHooks";
 
 const schema = yup
   .object({

@@ -1,6 +1,6 @@
 import { InboxOutlined, SearchOutlined } from "@ant-design/icons";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
+import { useFirestoreCollectionMutation } from "lib/queryHooks";
 import {
   Button,
   Form as FormAntDeisgn,
@@ -15,7 +15,7 @@ import {
 } from "antd";
 import type { FormInstance } from "antd/es/form";
 import dayjs, { Dayjs } from "dayjs";
-import { collection, doc, getDoc, getDocs, query } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query } from "lib/db";
 import {
   find,
   groupBy,

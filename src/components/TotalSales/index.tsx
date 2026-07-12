@@ -1,6 +1,6 @@
 import { Divider, Select, SelectProps } from "antd";
 import dayjs from "dayjs";
-import { collection, getDocs, query } from "firebase/firestore";
+import { collection, getDocs, query } from "lib/db";
 import { findIndex, groupBy, keys, map, sumBy } from "lodash";
 import { useEffect, useState } from "react";
 import Chart from "react-apexcharts";

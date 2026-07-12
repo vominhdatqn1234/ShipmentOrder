@@ -1,4 +1,4 @@
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { collection, getDocs, limit, query, where } from "lib/db";
 import { useEffect, useState } from "react";
 import { firestore } from "../../../lib/firebase";
 import { EmployeeModel } from "../../../models";

@@ -1,4 +1,4 @@
-import { Button, Checkbox, Form, FormInstance, Input } from "antd";
+import { Button, Form, FormInstance, Input } from "antd";
 import React, { useRef, useState } from "react";
 import { EyeInvisibleOutlined, EyeTwoTone } from "@ant-design/icons";
 import { FormItem } from "../../../components/Form";
@@ -11,11 +11,10 @@ import {
   getDocs,
   doc,
   updateDoc,
-} from "firebase/firestore";
+} from "lib/db";
 import * as yup from "yup";
 import { toast } from "react-toastify";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { regexPassword } from "../../../utils";
 import { isEmpty } from "lodash";
 import { hash } from "bcryptjs";
 import { firestore } from "../../../lib/firebase";
@@ -28,17 +27,43 @@ const schema = yup
     email: yup.string().required("Vui lòng nhập email"),
     password: yup
       .string()
-      .min(8, "Độ dài từ 8-50 kí tự")
-      .max(50, "Độ dài từ 8-50 kí tự")
-      .matches(
-        regexPassword,
-        "Chứa ít nhất một kí tự thường, một kí tự hoa, một kí tự đặc biệt và một số"
-      )
+      .min(5, "Mật khẩu tối thiểu 5 kí tự")
+      .matches(/^\S+$/, "Mật khẩu không được chứa dấu cách")
       .required("Vui lòng nhập mật khẩu"),
   })
   .required();
 
-export default function LoginForm() {
+const TEXT = {
+  vi: {
+    email: "Email/ Tên đăng nhập",
+    emailPh: "Nhập email của bạn",
+    password: "Mật khẩu",
+    passwordPh: "Nhập mật khẩu",
+    submit: "Đăng Nhập",
+    noAccount: "Chưa có tài khoản?",
+    signup: "Đăng ký",
+  },
+  en: {
+    email: "Email/ Username",
+    emailPh: "Enter your email",
+    password: "Password",
+    passwordPh: "Enter your password",
+    submit: "Login",
+    noAccount: "Don’t have account?",
+    signup: "Register",
+  },
+};
+
+export default function LoginForm({
+  onSignUp,
+  prefillEmail,
+  lang = "vi",
+}: {
+  onSignUp?: () => void;
+  prefillEmail?: string;
+  lang?: "vi" | "en";
+}) {
+  const t = TEXT[lang];
   const [token, setToken] = useLocalStorage("token", null);
   const [remember, setRemember] = useLocalStorage("remember", false);
   const [formLogin, setFormLogin] = useLocalStorage("formLogin", {
@@ -53,7 +78,7 @@ export default function LoginForm() {
   const navigate = useNavigate();
 
   const defaultValues = {
-    email: formLogin.email,
+    email: prefillEmail || formLogin.email,
     password: formLogin.password,
     remember,
   };
@@ -71,11 +96,11 @@ export default function LoginForm() {
   return (
     <>
       <Form
-        className="space-y-4 md:space-y-6"
         form={form}
         name="control-contect-ref"
         ref={formRef}
         layout="vertical"
+        requiredMark={false}
         initialValues={defaultValues}
         onFinish={handleSubmit(async (data) => {
           try {
@@ -125,38 +150,70 @@ export default function LoginForm() {
           }
         })}
       >
-        <FormItem control={control} name="email" label="Email">
+        <FormItem
+          control={control}
+          name="email"
+          label={
+            <span className="text-base font-semibold text-gray-900">
+              {t.email}
+            </span>
+          }
+        >
           <Input
             allowClear
-            className="h-[48px]"
-            placeholder="Vui lòng nhập email"
+            className="h-[48px] rounded-lg"
+            placeholder={t.emailPh}
           />
         </FormItem>
-        <FormItem control={control} name="password" label="Mật khẩu">
+        <FormItem
+          control={control}
+          name="password"
+          label={
+            <span className="text-base font-semibold text-gray-900">
+              {t.password}
+            </span>
+          }
+          className="!mb-6"
+        >
           <Input.Password
             allowClear
-            className="h-[48px]"
+            className="h-[48px] rounded-lg"
             type="password"
             iconRender={(visible) =>
               visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />
             }
-            placeholder="Vui lòng nhập mật khẩu"
+            placeholder={t.passwordPh}
           />
-        </FormItem>
-        <FormItem control={control} name="remember" valuePropName="checked">
-          <Checkbox>Remember me</Checkbox>
         </FormItem>
         <Button
           loading={loading}
           disabled={!isEmpty(errors)}
-          type="primary"
           htmlType="submit"
           block
           size="large"
+          className="h-[52px] rounded-xl border-0 font-semibold text-base"
+          style={{
+            background: "linear-gradient(90deg, #2E8FF7 0%, #22D2A0 100%)",
+            color: "#fff",
+          }}
         >
-          Đăng nhập
+          {t.submit}
         </Button>
       </Form>
+
+      <p className="text-center text-gray-700 mt-8 mb-2">
+        {t.noAccount}{" "}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            onSignUp?.();
+          }}
+          className="text-[#2563EB] font-semibold hover:underline"
+        >
+          {t.signup}
+        </a>
+      </p>
     </>
   );
 }

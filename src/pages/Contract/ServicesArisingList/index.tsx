@@ -16,7 +16,7 @@ import type {
   ColumnsType,
   FilterConfirmProps,
 } from "antd/es/table/interface";
-import { collection, deleteDoc, doc } from "firebase/firestore";
+import { collection, deleteDoc, doc } from "lib/db";
 import { useRef, useState } from "react";
 import Highlighter from "react-highlight-words";
 import { FaEdit } from "react-icons/fa";

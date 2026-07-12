@@ -24,8 +24,8 @@ import {
   query,
   updateDoc,
   where,
-} from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+} from "lib/db";
+import { getDownloadURL, ref, uploadBytesResumable } from "lib/supastorage";
 import { isEmpty } from "lodash";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";

@@ -30,9 +30,9 @@ import { capitalize, filter, find, isEmpty, map, reduce, remove } from "lodash";
 import { FormItem } from "../../../components/Form";
 import { RcFile } from "antd/es/upload";
 import { firestore, storage } from "../../../lib/firebase";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { collection } from "firebase/firestore";
-import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
+import { ref, uploadBytesResumable, getDownloadURL } from "lib/supastorage";
+import { collection } from "lib/db";
+import { useFirestoreCollectionMutation } from "lib/queryHooks";
 import { v4 as uuidv4 } from "uuid";
 import {
   StatusColorType,

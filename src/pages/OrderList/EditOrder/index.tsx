@@ -9,7 +9,7 @@ import {
 } from "antd";
 import type { FormInstance } from "antd/es/form";
 import dayjs from "dayjs";
-import { collection, doc, updateDoc } from "firebase/firestore";
+import { collection, doc, updateDoc } from "lib/db";
 import { produce } from "immer";
 import { isEmpty, map, omit } from "lodash";
 import { useEffect, useRef, useState } from "react";

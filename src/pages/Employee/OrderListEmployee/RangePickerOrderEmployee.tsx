@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import React, { useEffect, useState } from "react";
 import type { Dayjs } from "dayjs";
 import { isNil, map } from "lodash";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "lib/db";
 import { firestore } from "../../../lib/firebase";
 // import { useOrdersHook } from "./useOrdersHook";
 import { useOrderSlice } from "../../../store/useOrderSlice";

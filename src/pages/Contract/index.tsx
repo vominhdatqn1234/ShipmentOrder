@@ -31,7 +31,7 @@ import ColorButton from "../../components/ColorButton";
 import { colors } from "../../styles/colors";
 import { useQueryClient } from "react-query";
 import { useContract } from "./useContract";
-import { collection, deleteDoc, doc } from "firebase/firestore";
+import { collection, deleteDoc, doc } from "lib/db";
 import { firestore } from "../../lib/firebase";
 import { ContractModel } from "../../models";
 import EditContract from "./EditContract";

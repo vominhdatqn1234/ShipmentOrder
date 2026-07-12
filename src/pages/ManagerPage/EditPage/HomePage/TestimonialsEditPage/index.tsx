@@ -13,18 +13,18 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import type { UploadProps } from "antd";
 import { v4 as uuidv4 } from "uuid";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { collection, doc, updateDoc } from "firebase/firestore";
+import { ref, uploadBytesResumable, getDownloadURL } from "lib/supastorage";
+import { collection, doc, updateDoc } from "lib/db";
 import { firestore, storage } from "../../../../../lib/firebase";
 import { FormItem } from "../../../../../components/Form";
 import Dragger from "antd/es/upload/Dragger";
 import { InboxOutlined } from "@ant-design/icons";
-// import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
+// import { useFirestoreCollectionMutation } from "lib/queryHooks";
 import { isEmpty } from "lodash";
 import { HomePageModal, ServiceModal } from "../../../../../models";
 import { useQueryClient } from "react-query";
 // import ServiceEditForm from "./ServiceEditForm";
-import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
+import { useFirestoreCollectionMutation } from "lib/queryHooks";
 import ReviewerForm from "./ReviewerForm";
 
 const schema = yup

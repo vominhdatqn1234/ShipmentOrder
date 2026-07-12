@@ -22,8 +22,8 @@ import {
 } from "antd";
 import type { FormInstance } from "antd/es/form";
 import dayjs from "dayjs";
-import { collection, doc, updateDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { collection, doc, updateDoc } from "lib/db";
+import { getDownloadURL, ref, uploadBytesResumable } from "lib/supastorage";
 import {
   capitalize,
   filter,

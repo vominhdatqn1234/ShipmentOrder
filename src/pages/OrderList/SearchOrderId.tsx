@@ -1,7 +1,7 @@
 import Search from "antd/es/input/Search";
 import React, { useState } from "react";
 import { debounce, filter, find, isEmpty } from "lodash";
-import { collection, query, where, limit, getDocs } from "firebase/firestore";
+import { collection, query, where, limit, getDocs } from "lib/db";
 import { firestore } from "../../lib/firebase";
 import { useOrderSlice } from "../../store/useOrderSlice";
 import { useUser } from "../../store/useUser";

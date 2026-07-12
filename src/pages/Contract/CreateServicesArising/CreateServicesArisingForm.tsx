@@ -1,8 +1,8 @@
 import { yupResolver } from "@hookform/resolvers/yup";
-import { useFirestoreCollectionMutation } from "@react-query-firebase/firestore";
+import { useFirestoreCollectionMutation } from "lib/queryHooks";
 import { Button, Form as FormAntDeisgn, Input, InputNumber, message } from "antd";
 import type { FormInstance } from "antd/es/form";
-import { collection } from "firebase/firestore";
+import { collection } from "lib/db";
 import { isEmpty } from "lodash";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
