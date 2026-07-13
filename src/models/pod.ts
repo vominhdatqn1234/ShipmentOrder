@@ -39,6 +39,7 @@ export interface PodStore {
   name: string;
   systemCode: string;
   status: "active" | "locked";
+  lockedBy?: "admin" | "seller" | null; // ai khóa shop
   logo?: string;
   taxCode?: string;
   userId?: string;

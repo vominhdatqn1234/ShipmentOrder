@@ -255,7 +255,8 @@ export default function PodLayout() {
                   if (key === "logout") {
                     setToken(null);
                     window.location.href = "/auth/login";
-                  } else if (key === "stores") navigate("/dashboard/stores");
+                  } else if (key === "profile") navigate("/dashboard/profile");
+                  else if (key === "stores") navigate("/dashboard/stores");
                   else if (key === "services") navigate("/dashboard/services");
                 },
               }}

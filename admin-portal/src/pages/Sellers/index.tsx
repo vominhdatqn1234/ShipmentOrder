@@ -6,6 +6,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Popover,
   Select,
   Tooltip,
   message,
@@ -14,6 +15,8 @@ import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FiDownload,
+  FiEdit3,
+  FiEye,
   FiMaximize2,
   FiMinimize2,
   FiRefreshCw,
@@ -31,6 +34,7 @@ import {
 } from "../../hooks/useAdmin";
 import { ORDER_STATUS, PodOrder, Seller } from "../../models/admin";
 import { downloadCSV, parseCSV, toCSV } from "../../lib/csvPod";
+import { toDirectImageUrl } from "../../lib/imageUrl";
 
 const STATUS_TABS = [
   { key: "pending_approval", label: "Đơn chờ duyệt" },
@@ -64,11 +68,16 @@ export default function Sellers() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [tableFull, setTableFull] = useState(false);
   const [detail, setDetail] = useState<PodOrder | null>(null);
-  const [feeEdit, setFeeEdit] = useState<{
-    seller: Seller;
-    field: "markup" | "perOrderFee" | "discount";
-  } | null>(null);
-  const [feeValue, setFeeValue] = useState(0);
+  const [sellerDetail, setSellerDetail] = useState<Seller | null>(null);
+  const [sellerEdit, setSellerEdit] = useState<Seller | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    markup: 0,
+    perOrderFee: 0,
+    discount: 0,
+  });
   const trackingRef = useRef<HTMLInputElement>(null);
   const PAGE_SIZE = 50;
 
@@ -117,22 +126,41 @@ export default function Sellers() {
     );
   }, [orders]);
 
-  const openFeeEdit = (
-    seller: Seller,
-    field: "markup" | "perOrderFee" | "discount"
+  // Sửa nhanh 1 khoản phí ngay trong danh sách (không mở modal)
+  const saveFeeInline = async (
+    id: string,
+    field: "markup" | "perOrderFee" | "discount",
+    value: number
   ) => {
-    setFeeEdit({ seller, field });
-    setFeeValue((seller as any)[field] || 0);
+    await sellerMut.update.mutateAsync({ id, [field]: value || 0 });
+    message.success("Đã cập nhật phí");
   };
 
-  const saveFee = async () => {
-    if (!feeEdit) return;
-    await sellerMut.update.mutateAsync({
-      id: feeEdit.seller.id,
-      [feeEdit.field]: feeValue,
+  const openSellerEdit = (seller: Seller) => {
+    setSellerEdit(seller);
+    setEditForm({
+      name: seller.name || "",
+      email: seller.email || "",
+      phone: seller.phone || "",
+      markup: seller.markup || 0,
+      perOrderFee: seller.perOrderFee || 0,
+      discount: seller.discount || 0,
     });
-    message.success("Đã cập nhật");
-    setFeeEdit(null);
+  };
+
+  const saveSellerEdit = async () => {
+    if (!sellerEdit) return;
+    await sellerMut.update.mutateAsync({
+      id: sellerEdit.id,
+      name: editForm.name.trim(),
+      email: editForm.email.trim(),
+      phone: editForm.phone.trim(),
+      markup: editForm.markup || 0,
+      perOrderFee: editForm.perOrderFee || 0,
+      discount: editForm.discount || 0,
+    });
+    message.success("Đã cập nhật thông tin seller");
+    setSellerEdit(null);
   };
 
   const exportOrders = (list: PodOrder[], filename: string) => {
@@ -198,10 +226,18 @@ export default function Sellers() {
     );
   };
 
-  const feeLabels: Record<string, string> = {
-    markup: "Phí in thêm (Markup) $",
-    perOrderFee: "Phí xử lý đơn (Per Order) $/đơn",
-    discount: "Ưu đãi (Hiển thị) $",
+  const saveTracking = async (o: PodOrder, tracking: string) => {
+    await orderMut.update.mutateAsync({ id: o.id, tracking });
+    message.success(
+      tracking
+        ? `Đã lưu tracking cho đơn ${o.orderCode}`
+        : `Đã xóa tracking đơn ${o.orderCode}`
+    );
+  };
+
+  const savePrintHouse = async (o: PodOrder, printHouse: string) => {
+    await orderMut.update.mutateAsync({ id: o.id, printHouse } as any);
+    message.success(`Đã cập nhật Nhà In cho đơn ${o.orderCode}`);
   };
 
   return (
@@ -336,120 +372,135 @@ export default function Sellers() {
               return (
                 <div
                   key={seller.id}
-                  className="border border-gray-200 rounded-xl bg-white p-4"
+                  className="border border-gray-200 rounded-lg bg-white px-3 py-2.5 hover:border-gray-300"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-semibold text-gray-900">
-                      {seller.name || seller.email}
-                    </span>
-                    <span className="text-[11px] bg-gray-100 rounded-full px-2 py-0.5 text-gray-500">
-                      {sellerStores.length} Shops
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSellerDetail(seller)}
+                      className="w-8 h-8 shrink-0 rounded-full bg-[#171826] text-white text-xs font-bold flex items-center justify-center cursor-pointer border-0"
+                    >
+                      {(seller.name || seller.email || "A")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </button>
+                    <div
+                      className="min-w-0 flex-1 cursor-pointer"
+                      onClick={() => setSellerDetail(seller)}
+                    >
+                      <div className="font-semibold text-gray-900 text-[13px] truncate hover:text-[#2563EB]">
+                        {seller.name || seller.email}
+                      </div>
+                      <div className="text-[11px] text-gray-400 truncate">
+                        {seller.email || "—"} · {sellerStores.length} shop
+                      </div>
+                    </div>
+                    <Tooltip title="Xem chi tiết">
+                      <button
+                        onClick={() => setSellerDetail(seller)}
+                        className="w-7 h-7 shrink-0 rounded-md border border-gray-200 bg-white text-gray-500 inline-flex items-center justify-center cursor-pointer hover:bg-gray-100"
+                      >
+                        <FiEye size={13} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip title="Sửa thông tin seller">
+                      <button
+                        onClick={() => openSellerEdit(seller)}
+                        className="w-7 h-7 shrink-0 rounded-md border border-[#D6E4FF] bg-[#EFF4FF] text-[#2563EB] inline-flex items-center justify-center cursor-pointer hover:bg-[#2563EB] hover:text-white"
+                      >
+                        <FiEdit3 size={13} />
+                      </button>
+                    </Tooltip>
+                    <Popconfirm
+                      title={`Xóa seller "${seller.name || seller.email}"?`}
+                      description={
+                        sellerStores.length
+                          ? `Seller đang có ${sellerStores.length} shop. Xóa seller không tự xóa shop/đơn. Không thể hoàn tác.`
+                          : "Hành động này không thể hoàn tác."
+                      }
+                      okText="Xóa"
+                      cancelText="Hủy"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={async () => {
+                        await sellerMut.remove.mutateAsync(seller.id);
+                        message.success(
+                          `Đã xóa seller ${seller.name || seller.email}`
+                        );
+                      }}
+                    >
+                      <Tooltip title="Xóa seller">
+                        <button className="w-7 h-7 shrink-0 rounded-md border border-red-100 bg-red-50 text-red-500 inline-flex items-center justify-center cursor-pointer hover:bg-red-500 hover:text-white">
+                          <FiTrash2 size={13} />
+                        </button>
+                      </Tooltip>
+                    </Popconfirm>
                   </div>
-                  <div className="space-y-1.5 text-xs border-b border-gray-100 pb-3 mb-3">
-                    <div className="flex items-center justify-between bg-gray-50 rounded px-2 py-1.5">
-                      <span className="text-gray-500">
-                        Phí in thêm (Markup):{" "}
-                        <b className="text-red-500">+${seller.markup || 0}</b>
-                      </span>
-                      <button
-                        onClick={() => openFeeEdit(seller, "markup")}
-                        className="text-[#2563EB] bg-transparent border-0 cursor-pointer text-xs"
-                      >
-                        Sửa phí
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between bg-gray-50 rounded px-2 py-1.5">
-                      <span className="text-gray-500">
-                        Phí xử lý đơn:{" "}
-                        <b className="text-red-500">
-                          +${seller.perOrderFee || 0}/đơn
-                        </b>
-                      </span>
-                      <button
-                        onClick={() => openFeeEdit(seller, "perOrderFee")}
-                        className="text-[#2563EB] bg-transparent border-0 cursor-pointer text-xs"
-                      >
-                        Sửa phí
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between bg-gray-50 rounded px-2 py-1.5">
-                      <span className="text-gray-500">
-                        Ưu đãi: <b>${seller.discount || 0}</b>
-                        <span className="block text-[10px] text-gray-400">
-                          (Hạng thành viên tiêu chuẩn)
-                        </span>
-                      </span>
-                      <button
-                        onClick={() => openFeeEdit(seller, "discount")}
-                        className="text-[#2563EB] bg-transparent border-0 cursor-pointer text-xs"
-                      >
-                        Sửa ưu đãi
-                      </button>
-                    </div>
-                  </div>
-                  {sellerStores.length ? (
-                    <div className="space-y-2">
-                      {sellerStores.map((st) => (
+
+                  {/* Sửa nhanh phí ngay tại chỗ */}
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    {(
+                      [
+                        {
+                          field: "markup",
+                          label: "Markup",
+                          full: "phí in thêm (Markup)",
+                          box: "bg-emerald-50 border-emerald-200",
+                          text: "text-emerald-600",
+                        },
+                        {
+                          field: "perOrderFee",
+                          label: "Đơn",
+                          full: "phí xử lý đơn",
+                          box: "bg-orange-50 border-orange-200",
+                          text: "text-orange-600",
+                        },
+                        {
+                          field: "discount",
+                          label: "Ưu đãi",
+                          full: "ưu đãi",
+                          box: "bg-violet-50 border-violet-200",
+                          text: "text-violet-600",
+                        },
+                      ] as const
+                    ).map(({ field, label, full, box, text }) => (
+                      <Tooltip key={field} title={`Sửa ${full}`}>
                         <div
-                          key={st.id}
-                          className="flex items-center justify-between text-xs"
+                          className={`flex items-center gap-1 rounded-md border px-1.5 py-0.5 ${box}`}
                         >
-                          <span className="truncate">🏪 {st.name}</span>
-                          <span className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                st.status === "active"
-                                  ? "bg-emerald-50 text-emerald-600"
-                                  : "bg-red-50 text-red-500"
-                              }`}
-                            >
-                              {st.status === "active" ? "Hoạt động" : "Đã khóa"}
-                            </span>
-                            <Popconfirm
-                              title={`${
-                                st.status === "active" ? "Khóa" : "Mở khóa"
-                              } shop "${st.name}"?`}
-                              okText="OK"
-                              cancelText="Hủy"
-                              onConfirm={() =>
-                                storeMut.update.mutate({
-                                  id: st.id,
-                                  status:
-                                    st.status === "active"
-                                      ? "locked"
-                                      : "active",
-                                })
-                              }
-                            >
-                              <button className="text-amber-600 bg-transparent border-0 cursor-pointer text-xs">
-                                {st.status === "active" ? "Khóa" : "Mở"}
-                              </button>
-                            </Popconfirm>
-                            <Popconfirm
-                              title={`Xóa shop "${st.name}"?`}
-                              description="Không thể hoàn tác."
-                              okText="Xóa"
-                              cancelText="Hủy"
-                              okButtonProps={{ danger: true }}
-                              onConfirm={() => storeMut.remove.mutate(st.id)}
-                            >
-                              <button className="text-red-500 bg-transparent border-0 cursor-pointer text-xs">
-                                Xóa
-                              </button>
-                            </Popconfirm>
+                          <span className={`text-[10px] font-semibold ${text}`}>
+                            {label}
                           </span>
+                          <InputNumber
+                            size="small"
+                            min={0}
+                            step={0.1}
+                            prefix="$"
+                            bordered={false}
+                            className={`w-[62px] text-[12px] font-bold ${text}`}
+                            defaultValue={(seller as any)[field] || 0}
+                            onBlur={(e) => {
+                              const v =
+                                parseFloat(
+                                  (e.target as HTMLInputElement).value.replace(
+                                    "$",
+                                    ""
+                                  )
+                                ) || 0;
+                              if (v !== ((seller as any)[field] || 0))
+                                saveFeeInline(seller.id, field, v);
+                            }}
+                          />
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-400 italic">
-                      Chưa có cửa hàng nào.
-                    </div>
-                  )}
+                      </Tooltip>
+                    ))}
+                  </div>
                 </div>
               );
             })}
+            {!realSellers.length && (
+              <div className="text-xs text-gray-400 italic">
+                Chưa có seller nào.
+              </div>
+            )}
           </div>
         </div>
 
@@ -514,6 +565,8 @@ export default function Sellers() {
                   <th className="p-3 font-medium">Ngày Lên Đơn</th>
                   <th className="p-3 font-medium">Ngày Thanh Toán</th>
                   <th className="p-3 font-medium">Phôi Fulfill</th>
+                  <th className="p-3 font-medium">Thiết kế</th>
+                  <th className="p-3 font-medium">Nhà In</th>
                   <th className="p-3 font-medium">Tracking</th>
                   <th className="p-3 font-medium text-right">Giá</th>
                   <th className="p-3 font-medium">Thao tác</th>
@@ -586,7 +639,73 @@ export default function Sellers() {
                         )}
                       </td>
                       <td className="p-3">
-                        {o.tracking ? (
+                        {(() => {
+                          const it = o.items?.[0];
+                          const img =
+                            it?.mockupUrl || it?.frontUrl || it?.backUrl;
+                          if (!img)
+                            return (
+                              <span className="text-gray-300 text-xs italic">
+                                —
+                              </span>
+                            );
+                          return (
+                            <Popover
+                              placement="right"
+                              content={
+                                <div className="w-[260px] h-[260px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+                                  <img
+                                    src={toDirectImageUrl(img)}
+                                    alt="design"
+                                    referrerPolicy="no-referrer"
+                                    className="max-w-full max-h-full object-contain"
+                                  />
+                                </div>
+                              }
+                            >
+                              <img
+                                src={toDirectImageUrl(img)}
+                                alt="design"
+                                referrerPolicy="no-referrer"
+                                className="w-9 h-9 rounded-md object-cover border border-gray-200 bg-gray-50 cursor-zoom-in"
+                              />
+                            </Popover>
+                          );
+                        })()}
+                      </td>
+                      <td className="p-3">
+                        <Input
+                          key={o.printHouse || ""}
+                          size="small"
+                          placeholder="Nhà in..."
+                          defaultValue={o.printHouse || ""}
+                          className="w-[120px]"
+                          onPressEnter={(e) =>
+                            (e.target as HTMLInputElement).blur()
+                          }
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v !== (o.printHouse || "")) savePrintHouse(o, v);
+                          }}
+                        />
+                      </td>
+                      <td className="p-3">
+                        {o.status === "shipping" ? (
+                          <Input
+                            key={o.tracking || ""}
+                            size="small"
+                            placeholder="Nhập mã tracking..."
+                            defaultValue={o.tracking || ""}
+                            className="w-[150px]"
+                            onPressEnter={(e) =>
+                              (e.target as HTMLInputElement).blur()
+                            }
+                            onBlur={(e) => {
+                              const v = e.target.value.trim();
+                              if (v !== (o.tracking || "")) saveTracking(o, v);
+                            }}
+                          />
+                        ) : o.tracking ? (
                           <span className="text-[#2563EB] text-xs">
                             {o.tracking}
                           </span>
@@ -639,7 +758,7 @@ export default function Sellers() {
                 })}
                 {!paged.length && (
                   <tr>
-                    <td colSpan={9} className="p-12 text-center text-gray-400">
+                    <td colSpan={11} className="p-12 text-center text-gray-400">
                       Không có đơn hàng nào
                     </td>
                   </tr>
@@ -674,27 +793,88 @@ export default function Sellers() {
         </div>
       </div>
 
-      {/* Modal sửa phí */}
+      {/* Modal sửa thông tin seller */}
       <Modal
-        open={!!feeEdit}
-        title={feeEdit ? feeLabels[feeEdit.field] : ""}
+        open={!!sellerEdit}
+        title="Sửa thông tin Seller"
         okText="Lưu"
         cancelText="Hủy"
         confirmLoading={sellerMut.update.isLoading}
-        onOk={saveFee}
-        onCancel={() => setFeeEdit(null)}
+        onOk={saveSellerEdit}
+        onCancel={() => setSellerEdit(null)}
       >
-        <div className="pt-2">
-          <div className="text-sm text-gray-500 mb-2">
-            Seller: <b>{feeEdit?.seller.name || feeEdit?.seller.email}</b>
+        <div className="space-y-3 pt-2">
+          <div>
+            <div className="text-xs text-gray-500 mb-1">Tên seller</div>
+            <Input
+              value={editForm.name}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, name: e.target.value }))
+              }
+            />
           </div>
-          <InputNumber
-            className="w-full"
-            min={0}
-            step={0.1}
-            value={feeValue}
-            onChange={(v) => setFeeValue(v || 0)}
-          />
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <div className="text-xs text-gray-500 mb-1">Email</div>
+              <Input
+                value={editForm.email}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, email: e.target.value }))
+                }
+              />
+            </div>
+            <div className="flex-1">
+              <div className="text-xs text-gray-500 mb-1">SĐT</div>
+              <Input
+                value={editForm.phone}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, phone: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <div className="text-xs text-gray-500 mb-1">
+                Phí in thêm (Markup) $
+              </div>
+              <InputNumber
+                className="w-full"
+                min={0}
+                step={0.1}
+                value={editForm.markup}
+                onChange={(v) =>
+                  setEditForm((f) => ({ ...f, markup: v || 0 }))
+                }
+              />
+            </div>
+            <div className="flex-1">
+              <div className="text-xs text-gray-500 mb-1">
+                Phí xử lý đơn $/đơn
+              </div>
+              <InputNumber
+                className="w-full"
+                min={0}
+                step={0.1}
+                value={editForm.perOrderFee}
+                onChange={(v) =>
+                  setEditForm((f) => ({ ...f, perOrderFee: v || 0 }))
+                }
+              />
+            </div>
+            <div className="flex-1">
+              <div className="text-xs text-gray-500 mb-1">Ưu đãi $</div>
+              <InputNumber
+                className="w-full"
+                min={0}
+                step={0.1}
+                value={editForm.discount}
+                onChange={(v) =>
+                  setEditForm((f) => ({ ...f, discount: v || 0 }))
+                }
+              />
+            </div>
+          </div>
         </div>
       </Modal>
 
@@ -806,6 +986,154 @@ export default function Sellers() {
 
                 <div className="text-right font-bold text-base">
                   Tổng: {money(detail.total)}
+                </div>
+              </div>
+            );
+          })()}
+      </Modal>
+
+      {/* Modal chi tiết seller */}
+      <Modal
+        open={!!sellerDetail}
+        width={520}
+        footer={null}
+        title="Thông tin Seller"
+        onCancel={() => setSellerDetail(null)}
+      >
+        {sellerDetail &&
+          (() => {
+            const s = sellerDetail;
+            const sStores = stores.filter((st) => st.userId === s.id);
+            const sOrders = orders.filter((o) => o.userId === s.id);
+            const revenue = sOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+            const Row = ({
+              label,
+              value,
+            }: {
+              label: string;
+              value: React.ReactNode;
+            }) => (
+              <div className="flex justify-between gap-4 py-2 border-b border-gray-50">
+                <span className="text-gray-400">{label}</span>
+                <span className="font-medium text-gray-800 text-right">
+                  {value}
+                </span>
+              </div>
+            );
+            return (
+              <div className="pt-2 text-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="w-11 h-11 rounded-full bg-[#171826] text-white font-bold flex items-center justify-center">
+                    {(s.name || s.email || "A").charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-gray-900 text-base truncate">
+                      {s.name || "—"}
+                    </div>
+                    <div className="text-gray-400 text-xs truncate">
+                      {s.email || "—"}
+                    </div>
+                  </div>
+                  <Button
+                    size="small"
+                    icon={<FiEdit3 size={13} />}
+                    className="ml-auto"
+                    onClick={() => {
+                      setSellerDetail(null);
+                      openSellerEdit(s);
+                    }}
+                  >
+                    Sửa
+                  </Button>
+                </div>
+
+                <Row label="Email" value={s.email || "—"} />
+                <Row label="SĐT" value={s.phone || "—"} />
+                <Row label="Quyền" value={s.permission || "Seller"} />
+                <Row
+                  label="Ngày tạo"
+                  value={
+                    s.created ? dayjs(s.created).format("DD/MM/YYYY") : "—"
+                  }
+                />
+                <Row
+                  label="Phí in thêm (Markup)"
+                  value={`+$${s.markup || 0}`}
+                />
+                <Row
+                  label="Phí xử lý đơn"
+                  value={`+$${s.perOrderFee || 0}/đơn`}
+                />
+                <Row label="Ưu đãi" value={`$${s.discount || 0}`} />
+                <Row label="Số shop" value={`${sStores.length}`} />
+                <Row label="Tổng số đơn" value={`${sOrders.length}`} />
+                <Row label="Tổng doanh thu" value={money(revenue)} />
+
+                <div className="mt-4">
+                  <div className="text-xs font-semibold text-gray-500 mb-2">
+                    DANH SÁCH SHOP
+                  </div>
+                  {sStores.length ? (
+                    <div className="space-y-1.5">
+                      {sStores.map((st) => (
+                        <div
+                          key={st.id}
+                          className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 gap-2"
+                        >
+                          <span className="truncate">🏪 {st.name}</span>
+                          <span className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                st.status === "active"
+                                  ? "bg-emerald-50 text-emerald-600"
+                                  : "bg-red-50 text-red-500"
+                              }`}
+                            >
+                              {st.status === "active" ? "Hoạt động" : "Đã khóa"}
+                            </span>
+                            <Popconfirm
+                              title={`${
+                                st.status === "active" ? "Khóa" : "Mở khóa"
+                              } shop "${st.name}"?`}
+                              okText="OK"
+                              cancelText="Hủy"
+                              onConfirm={() =>
+                                storeMut.update.mutate({
+                                  id: st.id,
+                                  status:
+                                    st.status === "active"
+                                      ? "locked"
+                                      : "active",
+                                  lockedBy:
+                                    st.status === "active" ? "admin" : null,
+                                } as any)
+                              }
+                            >
+                              <button className="text-amber-600 bg-transparent border-0 cursor-pointer text-xs">
+                                {st.status === "active" ? "Khóa" : "Mở"}
+                              </button>
+                            </Popconfirm>
+                            <Popconfirm
+                              title={`Xóa shop "${st.name}"?`}
+                              description="Không thể hoàn tác."
+                              okText="Xóa"
+                              cancelText="Hủy"
+                              okButtonProps={{ danger: true }}
+                              onConfirm={() => storeMut.remove.mutate(st.id)}
+                            >
+                              <button className="text-red-500 bg-transparent border-0 cursor-pointer text-xs">
+                                Xóa
+                              </button>
+                            </Popconfirm>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-gray-400 italic">
+                      Chưa có cửa hàng nào.
+                    </div>
+                  )}
                 </div>
               </div>
             );

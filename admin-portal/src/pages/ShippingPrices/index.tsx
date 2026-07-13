@@ -4,10 +4,11 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Tooltip,
   message,
 } from "antd";
 import { useState } from "react";
-import { FiPlus } from "react-icons/fi";
+import { FiEdit3, FiPlus, FiTrash2 } from "react-icons/fi";
 import {
   useShippingMutations,
   useShippingPrices,
@@ -108,24 +109,30 @@ export default function ShippingPrices() {
                 <td className="p-3 text-gray-400 italic max-w-[180px] truncate">
                   {p.note}
                 </td>
-                <td className="p-3 text-right space-x-3 whitespace-nowrap">
-                  <button
-                    onClick={() => openModal(p)}
-                    className="text-[#2563EB] bg-transparent border-0 cursor-pointer"
-                  >
-                    Sửa
-                  </button>
-                  <Popconfirm
-                    title="Xóa mức giá này?"
-                    okText="Xóa"
-                    cancelText="Hủy"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => remove.mutate(p.id)}
-                  >
-                    <button className="text-red-500 bg-transparent border-0 cursor-pointer">
-                      Xóa
-                    </button>
-                  </Popconfirm>
+                <td className="p-3 text-right whitespace-nowrap">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Tooltip title="Sửa mức giá">
+                      <button
+                        onClick={() => openModal(p)}
+                        className="w-8 h-8 rounded-lg border border-[#D6E4FF] bg-[#EFF4FF] text-[#2563EB] flex items-center justify-center cursor-pointer hover:bg-[#2563EB] hover:text-white transition-colors"
+                      >
+                        <FiEdit3 size={14} />
+                      </button>
+                    </Tooltip>
+                    <Popconfirm
+                      title="Xóa mức giá này?"
+                      okText="Xóa"
+                      cancelText="Hủy"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => remove.mutate(p.id)}
+                    >
+                      <Tooltip title="Xóa mức giá">
+                        <button className="w-8 h-8 rounded-lg border border-red-100 bg-red-50 text-red-500 flex items-center justify-center cursor-pointer hover:bg-red-500 hover:text-white transition-colors">
+                          <FiTrash2 size={14} />
+                        </button>
+                      </Tooltip>
+                    </Popconfirm>
+                  </div>
                 </td>
               </tr>
             ))}

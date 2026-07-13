@@ -15,6 +15,7 @@ export interface Store {
   name: string;
   systemCode?: string;
   status: "active" | "locked";
+  lockedBy?: "admin" | "seller" | null; // ai khóa shop
   logo?: string;
   taxCode?: string;
   userId?: string;
@@ -43,6 +44,7 @@ export interface PodOrder {
   storeName?: string;
   status: string;
   tracking?: string;
+  printHouse?: string; // Nhà In được phân bổ
   source?: string;
   userId?: string;
   customerName?: string;
@@ -105,6 +107,15 @@ export interface ServiceItem {
   hot?: boolean;
   active?: boolean;
   icon?: string; // mã SVG thuần
+  created?: string;
+}
+
+export interface PodPrice {
+  id: string;
+  productType: string; // Loại Sản Phẩm
+  size: string; // Size
+  baseCost: number; // Giá Gốc (Base Cost)
+  extraPrintFee: number; // Phí In Mặt Phụ (in thêm/mặt)
   created?: string;
 }
 

@@ -1,4 +1,4 @@
-import { Button, Input, Modal, Popconfirm, message } from "antd";
+import { Button, Input, Modal, Popconfirm, Tooltip, message } from "antd";
 import { useState } from "react";
 import UploadImgButton from "../../../components/UploadImgButton";
 import { useStoreMutations, useStores } from "../../../hooks/usePod";
@@ -130,33 +130,43 @@ export default function Stores() {
                   >
                     Thiết lập
                   </button>
-                  <Popconfirm
-                    title={
-                      s.status === "active"
-                        ? `Khóa cửa hàng "${s.name}"?`
-                        : `Mở khóa cửa hàng "${s.name}"?`
-                    }
-                    description={
-                      s.status === "active"
-                        ? "Cửa hàng bị khóa sẽ ngừng hoạt động cho đến khi mở lại."
-                        : "Cửa hàng sẽ hoạt động trở lại."
-                    }
-                    okText={s.status === "active" ? "Khóa" : "Mở khóa"}
-                    cancelText="Hủy"
-                    okButtonProps={
-                      s.status === "active" ? { danger: true } : undefined
-                    }
-                    onConfirm={() =>
-                      update.mutate({
-                        id: s.id,
-                        status: s.status === "active" ? "locked" : "active",
-                      } as any)
-                    }
-                  >
-                    <button className="text-amber-600 bg-transparent border-0 cursor-pointer font-medium">
-                      {s.status === "active" ? "Khóa" : "Mở khóa"}
-                    </button>
-                  </Popconfirm>
+                  {s.status === "locked" &&
+                  (s as any).lockedBy === "admin" ? (
+                    <Tooltip title="Cửa hàng bị Admin khóa — bạn không thể tự mở. Vui lòng liên hệ admin.">
+                      <span className="text-gray-300 font-medium cursor-not-allowed">
+                        Admin đã khóa
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <Popconfirm
+                      title={
+                        s.status === "active"
+                          ? `Khóa cửa hàng "${s.name}"?`
+                          : `Mở khóa cửa hàng "${s.name}"?`
+                      }
+                      description={
+                        s.status === "active"
+                          ? "Cửa hàng bị khóa sẽ ngừng hoạt động cho đến khi mở lại."
+                          : "Cửa hàng sẽ hoạt động trở lại."
+                      }
+                      okText={s.status === "active" ? "Khóa" : "Mở khóa"}
+                      cancelText="Hủy"
+                      okButtonProps={
+                        s.status === "active" ? { danger: true } : undefined
+                      }
+                      onConfirm={() =>
+                        update.mutate({
+                          id: s.id,
+                          status: s.status === "active" ? "locked" : "active",
+                          lockedBy: s.status === "active" ? "seller" : null,
+                        } as any)
+                      }
+                    >
+                      <button className="text-amber-600 bg-transparent border-0 cursor-pointer font-medium">
+                        {s.status === "active" ? "Khóa" : "Mở khóa"}
+                      </button>
+                    </Popconfirm>
+                  )}
                   <Popconfirm
                     title={`Xóa cửa hàng "${s.name}"?`}
                     description="Hành động này không thể hoàn tác."

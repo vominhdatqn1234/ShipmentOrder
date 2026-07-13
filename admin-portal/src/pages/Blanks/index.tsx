@@ -6,6 +6,7 @@ import {
   Modal,
   Pagination,
   Popconfirm,
+  Progress,
   Switch,
   Tooltip,
   message,
@@ -60,6 +61,14 @@ export default function Blanks() {
   const [inStock, setInStock] = useState(true);
   const [specs, setSpecs] = useState("");
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const [deleteProgress, setDeleteProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const csvRef = useRef<HTMLInputElement>(null);
 
   // Parse cột dạng JSON array: ["S","M"] -> string[]
@@ -77,11 +86,13 @@ export default function Blanks() {
     setImporting(true);
     try {
       const rows = parseCSV(await file.text());
+      const valid = rows.filter((r) => (r["sku"] || r["SKU"] || "").trim());
+      setImportProgress({ done: 0, total: valid.length });
       let added = 0;
       let updated = 0;
-      for (const r of rows) {
+      let done = 0;
+      for (const r of valid) {
         const rowSku = (r["sku"] || r["SKU"] || "").trim();
-        if (!rowSku) continue;
         const data = {
           sku: rowSku,
           name: (r["name"] || "").trim() || rowSku,
@@ -107,12 +118,15 @@ export default function Blanks() {
           });
           added++;
         }
+        done++;
+        setImportProgress({ done, total: valid.length });
       }
       message.success(`Nhập CSV xong: thêm ${added} phôi, cập nhật ${updated} phôi`);
     } catch (e: any) {
       message.error(`Nhập CSV lỗi: ${e?.message || e}`);
     } finally {
       setImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -184,9 +198,18 @@ export default function Blanks() {
     );
 
   const handleBulkDelete = async () => {
-    await removeMany.mutateAsync(selectedIds);
-    message.success(`Đã xóa ${selectedIds.length} phôi`);
-    setSelectedIds([]);
+    const total = selectedIds.length;
+    setDeleteProgress({ done: 0, total });
+    try {
+      await removeMany.mutateAsync({
+        ids: selectedIds,
+        onProgress: (done, total) => setDeleteProgress({ done, total }),
+      });
+      message.success(`Đã xóa ${total} phôi`);
+      setSelectedIds([]);
+    } finally {
+      setDeleteProgress(null);
+    }
   };
 
   const openModal = (p?: BaseProduct) => {
@@ -250,7 +273,9 @@ export default function Blanks() {
             loading={importing}
             onClick={() => csvRef.current?.click()}
           >
-            Nhập CSV
+            {importProgress
+              ? `Đang nhập ${importProgress.done}/${importProgress.total}...`
+              : "Nhập CSV"}
           </Button>
           <Button icon={<FiDownload />} onClick={handleExportCatalog}>
             Xuất Catalog
@@ -277,6 +302,31 @@ export default function Blanks() {
         </div>
       </div>
 
+      {/* Tiến trình nhập CSV */}
+      {importProgress && (
+        <div className="bg-[#EFF4FF] border border-[#D6E4FF] rounded-xl px-5 py-4 mt-5">
+          <div className="flex items-center justify-between font-semibold text-[#2563EB] mb-2 text-sm">
+            <span>
+              ⏳ Đang nhập catalog... {importProgress.done}/
+              {importProgress.total} phôi
+            </span>
+            <span>
+              {Math.round((importProgress.done / importProgress.total) * 100)}%
+            </span>
+          </div>
+          <Progress
+            percent={Math.round(
+              (importProgress.done / importProgress.total) * 100
+            )}
+            showInfo={false}
+            status="active"
+          />
+          <div className="text-xs text-gray-400 mt-1">
+            Vui lòng không đóng trang trong lúc nhập.
+          </div>
+        </div>
+      )}
+
       {/* Thanh chọn nhiều */}
       {selectedIds.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mt-5 flex items-center gap-4 flex-wrap">
@@ -290,17 +340,33 @@ export default function Blanks() {
             cancelText="Hủy"
             okButtonProps={{ danger: true }}
             onConfirm={handleBulkDelete}
+            disabled={!!deleteProgress}
           >
-            <Button danger loading={removeMany.isLoading}>
-              Xóa đã chọn ({selectedIds.length})
+            <Button danger loading={removeMany.isLoading} disabled={!!deleteProgress}>
+              {deleteProgress
+                ? `Đang xóa ${deleteProgress.done}/${deleteProgress.total}...`
+                : `Xóa đã chọn (${selectedIds.length})`}
             </Button>
           </Popconfirm>
-          <button
-            onClick={() => setSelectedIds([])}
-            className="text-gray-400 text-sm bg-transparent border-0 cursor-pointer ml-auto"
-          >
-            Bỏ chọn tất cả
-          </button>
+          {deleteProgress ? (
+            <div className="flex-1 min-w-[160px] max-w-[280px]">
+              <Progress
+                percent={Math.round(
+                  (deleteProgress.done / deleteProgress.total) * 100
+                )}
+                size="small"
+                status="active"
+                strokeColor="#DC2626"
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setSelectedIds([])}
+              className="text-gray-400 text-sm bg-transparent border-0 cursor-pointer ml-auto"
+            >
+              Bỏ chọn tất cả
+            </button>
+          )}
         </div>
       )}
 

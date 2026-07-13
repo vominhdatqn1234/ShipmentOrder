@@ -93,3 +93,17 @@ alter table "services" add column if not exists "icon" text default '';
 -- (bổ sung) Chất liệu + thông số chi tiết cho phôi
 alter table "baseProducts" add column if not exists "material" text default '';
 alter table "baseProducts" add column if not exists "specs" text default '';
+
+-- (bổ sung) Bảng giá phôi POD theo Loại SP + Size
+create table if not exists "podPrices" (
+  id text primary key,
+  "productType" text,
+  size text,
+  "baseCost" numeric default 0,
+  "extraPrintFee" numeric default 0,
+  created text,
+  created_at timestamptz not null default now()
+);
+alter table "podPrices" disable row level security;
+create index if not exists podprices_type_idx on "podPrices" ("productType");
+notify pgrst, 'reload schema';

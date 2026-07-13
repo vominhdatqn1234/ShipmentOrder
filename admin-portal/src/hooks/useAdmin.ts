@@ -16,6 +16,7 @@ import {
   DesignRequest,
   LedgerEntry,
   PodOrder,
+  PodPrice,
   Seller,
   ServiceItem,
   ShippingPrice,
@@ -30,6 +31,7 @@ const shippingRef = collection(db, "shippingPrices");
 const designReqRef = collection(db, "designRequests");
 const servicesRef = collection(db, "services");
 const productsRef = collection(db, "baseProducts");
+const podPricesRef = collection(db, "podPrices");
 
 function toList<T>(snapshot: any): T[] {
   const out: T[] = [];
@@ -52,8 +54,19 @@ function crud(ref: any, key: string) {
       onSuccess: invalidate,
     });
     const removeMany = useMutation(
-      async (ids: string[]) => {
-        for (const id of ids) await deleteDoc(doc(ref, id));
+      async (
+        arg:
+          | string[]
+          | { ids: string[]; onProgress?: (done: number, total: number) => void }
+      ) => {
+        const ids = Array.isArray(arg) ? arg : arg.ids;
+        const onProgress = Array.isArray(arg) ? undefined : arg.onProgress;
+        let done = 0;
+        for (const id of ids) {
+          await deleteDoc(doc(ref, id));
+          done += 1;
+          onProgress?.(done, ids.length);
+        }
       },
       { onSuccess: invalidate }
     );
@@ -126,3 +139,10 @@ export function useBaseProducts() {
   return { ...q, products: toList<BaseProduct>(q.data) };
 }
 export const useBaseProductMutations = crud(productsRef, "adm-products");
+
+/* ---------- POD base prices (bảng giá phôi theo Loại + Size) ---------- */
+export function usePodPrices() {
+  const q = useQuery(["adm-pod-prices"], () => getDocs(query(podPricesRef)));
+  return { ...q, prices: toList<PodPrice>(q.data) };
+}
+export const usePodPriceMutations = crud(podPricesRef, "adm-pod-prices");

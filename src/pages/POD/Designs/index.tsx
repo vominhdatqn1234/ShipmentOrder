@@ -11,7 +11,11 @@ import {
 } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch, FiPlus, FiEdit3, FiTrash2, FiImage } from "react-icons/fi";
-import { useDesignMutations, useDesigns } from "../../../hooks/usePod";
+import {
+  useDesignMutations,
+  useDesigns,
+  useStores,
+} from "../../../hooks/usePod";
 import { Design, DesignExtraArea } from "../../../models/pod";
 import { downloadCSV, parseCSV, toCSV } from "../../../utils/csvPod";
 import { imageUrlCandidates } from "../../../utils/imageUrl";
@@ -471,7 +475,14 @@ export default function Designs() {
   const { designs } = useDesigns();
   const { add, update, remove, removeMany } = useDesignMutations();
   const { selectedStoreId } = usePodStore();
-  const hasStore = !!selectedStoreId;
+  const { stores } = useStores();
+  const selectedStore = stores.find((s) => s.id === selectedStoreId);
+  const shopLocked = selectedStore?.status === "locked";
+  // Chỉ cho thêm thiết kế khi có shop và shop không bị khóa
+  const hasStore = !!selectedStoreId && !shopLocked;
+  const storeBlockMsg = !selectedStoreId
+    ? "Bạn cần tạo cửa hàng trước khi thêm thiết kế"
+    : "Cửa hàng đang bị khóa — không thể thêm thiết kế. Vui lòng liên hệ admin.";
   const [search, setSearch] = useState("");
   const [detail, setDetail] = useState<Design | null>(null);
   const [focusAreas, setFocusAreas] = useState(false);
@@ -605,7 +616,7 @@ export default function Designs() {
 
   const handleImport = async (file: File) => {
     if (!hasStore) {
-      message.warning("Bạn cần tạo cửa hàng trước khi thêm thiết kế");
+      message.warning(storeBlockMsg);
       return;
     }
     const rows = parseCSV(await file.text());
@@ -687,13 +698,7 @@ export default function Designs() {
               }}
             />
           </div>
-          <Tooltip
-            title={
-              hasStore
-                ? ""
-                : "Bạn cần tạo cửa hàng trước khi thêm thiết kế (Quản lý Cửa hàng → Kết nối Store mới)"
-            }
-          >
+          <Tooltip title={hasStore ? "" : storeBlockMsg}>
             <Button
               type="primary"
               className={hasStore ? "bg-[#171826]" : ""}
@@ -701,9 +706,7 @@ export default function Designs() {
               disabled={!hasStore}
               onClick={() => {
                 if (!hasStore) {
-                  message.warning(
-                    "Bạn cần tạo cửa hàng trước khi thêm thiết kế"
-                  );
+                  message.warning(storeBlockMsg);
                   return;
                 }
                 setAddOpen(true);

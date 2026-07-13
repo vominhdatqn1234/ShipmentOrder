@@ -39,6 +39,7 @@ import { usePodStore } from "../../../store/usePodStore";
 import { downloadCSV, parseCSV, parseVariations, toCSV } from "../../../utils/csvPod";
 import OrderItemEditor from "./OrderItemEditor";
 import OrderModal from "./OrderModal";
+import { useAccountGuard } from "../../../hooks/useAccountGuard";
 import { PodOrderItem } from "../../../models/pod";
 
 type ViewTab = "list" | "import" | "create";
@@ -62,6 +63,16 @@ export default function Orders() {
   const { stores } = useStores();
   const { designs } = useDesigns();
   const { selectedStoreId } = usePodStore();
+  const { ensureAccount } = useAccountGuard();
+  // Chặn tạo đơn/import khi chưa có shop hoặc shop đang bị khóa
+  const selectedStore = stores.find((s) => s.id === selectedStoreId);
+  const shopLocked = selectedStore?.status === "locked";
+  const createBlockMsg = !stores.length
+    ? "Bạn chưa có shop nào — hãy tạo/kết nối shop trước"
+    : shopLocked
+    ? "Cửa hàng đang bị khóa — không thể tạo đơn/import. Vui lòng liên hệ admin."
+    : "";
+  const canCreate = !createBlockMsg;
   const [view, setView] = useState<ViewTab>("list");
   const [statusTab, setStatusTab] = useState("all");
   const [search, setSearch] = useState("");
@@ -212,6 +223,7 @@ export default function Orders() {
 
   /* ---------- Import CSV Etsy ---------- */
   const handleImportFile = async (file: File) => {
+    if (!canCreate) return message.warning(createBlockMsg);
     const rows = parseCSV(await file.text());
     const byOrder = new Map<string, any[]>();
     rows.forEach((r) => {
@@ -336,6 +348,8 @@ export default function Orders() {
   };
 
   const confirmImport = async () => {
+    if (!canCreate) return message.warning(createBlockMsg);
+    if (!(await ensureAccount())) return;
     setSyncProgress({ done: 0, total: importPreview.length });
     try {
       await addMany.mutateAsync({
@@ -365,21 +379,35 @@ export default function Orders() {
           <FiList /> Quản lý đơn
         </button>
         <button
-          onClick={() => setView("import")}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm cursor-pointer border-0 ${
-            view === "import"
-              ? "bg-[#171826] text-white font-bold"
-              : "bg-transparent text-gray-500"
+          onClick={() => {
+            if (!canCreate) return message.warning(createBlockMsg);
+            setView("import");
+          }}
+          disabled={!canCreate}
+          title={!canCreate ? createBlockMsg : undefined}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm border-0 ${
+            !canCreate
+              ? "cursor-not-allowed bg-transparent text-gray-300"
+              : view === "import"
+              ? "cursor-pointer bg-[#171826] text-white font-bold"
+              : "cursor-pointer bg-transparent text-gray-500"
           }`}
         >
           <FiFileText /> Import CSV
         </button>
         <button
           onClick={() => {
+            if (!canCreate) return message.warning(createBlockMsg);
             setPresetSku(undefined);
             setCreateOpen(true);
           }}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm cursor-pointer border-0 bg-transparent text-[#2563EB] font-medium"
+          disabled={!canCreate}
+          title={!canCreate ? createBlockMsg : undefined}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm border-0 font-medium ${
+            canCreate
+              ? "cursor-pointer bg-transparent text-[#2563EB]"
+              : "cursor-not-allowed bg-transparent text-gray-300"
+          }`}
         >
           <FiPlus /> Tạo đơn lẻ
         </button>

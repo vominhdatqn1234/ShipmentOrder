@@ -8,6 +8,7 @@ import {
   useStores,
 } from "../../../hooks/usePod";
 import { POD_STATUS, PodOrder, PodOrderItem } from "../../../models/pod";
+import { useAccountGuard } from "../../../hooks/useAccountGuard";
 import { usePodStore } from "../../../store/usePodStore";
 import { toDirectImageUrl } from "../../../utils/imageUrl";
 import UploadImgButton from "../../../components/UploadImgButton";
@@ -103,6 +104,7 @@ export default function OrderModal({
   const { stores } = useStores();
   const { selectedStoreId } = usePodStore();
   const { add, update } = usePodOrderMutations();
+  const { ensureAccount } = useAccountGuard();
   const [order, setOrder] = useState<Partial<PodOrder>>(emptyOrder());
 
   useEffect(() => {
@@ -146,6 +148,9 @@ export default function OrderModal({
       return message.error("Vui lòng nhập đủ địa chỉ giao hàng");
     if (!order.items?.length || order.items.some((i) => !i.productSku))
       return message.error("Vui lòng chọn loại sản phẩm (phôi) cho mỗi món");
+
+    // Tài khoản bị admin xóa/vô hiệu hóa -> tự đăng xuất, không cho tạo đơn
+    if (!(await ensureAccount())) return;
 
     const store = stores.find((s) => s.id === selectedStoreId);
     const total = (order.items || []).reduce(

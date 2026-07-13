@@ -12,6 +12,7 @@ const Designs = Loadable(lazy(() => import("../pages/POD/Designs")));
 const Orders = Loadable(lazy(() => import("../pages/POD/Orders")));
 const Stores = Loadable(lazy(() => import("../pages/POD/Stores")));
 const Services = Loadable(lazy(() => import("../pages/POD/Services")));
+const Profile = Loadable(lazy(() => import("../pages/POD/Profile")));
 
 const podChildren = [
   { path: "/dashboard", element: <Overview /> },
@@ -20,6 +21,7 @@ const podChildren = [
   { path: "/dashboard/orders", element: <Orders /> },
   { path: "/dashboard/stores", element: <Stores /> },
   { path: "/dashboard/services", element: <Services /> },
+  { path: "/dashboard/profile", element: <Profile /> },
 ];
 
 const routes = [
