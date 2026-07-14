@@ -3,9 +3,14 @@
  * Flat mode: mỗi field là một cột thật trên bảng (không dùng data jsonb).
  */
 
-export const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL as string;
-export const SUPABASE_ANON_KEY = process.env
-  .REACT_APP_SUPABASE_ANON_KEY as string;
+// Fallback hardcode để build trên Netlify không cần set env.
+// Env (nếu có) vẫn được ưu tiên. Anon key là key public, an toàn khi commit.
+export const SUPABASE_URL =
+  process.env.REACT_APP_SUPABASE_URL ||
+  "https://czypkctnlwyormkwjwfl.supabase.co";
+export const SUPABASE_ANON_KEY =
+  process.env.REACT_APP_SUPABASE_ANON_KEY ||
+  "sb_publishable_YRpA30DdlLKD0LrUP7-obw_zr3Jq1Bs";
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   // eslint-disable-next-line no-console

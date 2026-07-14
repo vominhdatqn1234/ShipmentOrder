@@ -1,7 +1,8 @@
 /** Upload ảnh lên Cloudinary (unsigned preset), trả về secure_url */
 export async function uploadToCloudinary(file: File): Promise<string> {
-  const cloud = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
-  const preset = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
+  const cloud = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || "grmclv0n";
+  const preset =
+    process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || "ml_default";
   if (!cloud || !preset) {
     throw new Error(
       "Thiếu REACT_APP_CLOUDINARY_CLOUD_NAME / REACT_APP_CLOUDINARY_UPLOAD_PRESET trong .env"
