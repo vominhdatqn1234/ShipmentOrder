@@ -1,0 +1,17 @@
+# Netlify config — CLIENT site (base directory = repo root)
+[build]
+  command = "yarn build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "18"
+  # CRA coi warning là error khi CI=true (mặc định trên Netlify) -> tắt đi
+  CI = "false"
+  # Tránh out-of-memory khi build CRA lớn
+  NODE_OPTIONS = "--max-old-space-size=4096"
+
+# SPA fallback cho react-router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
