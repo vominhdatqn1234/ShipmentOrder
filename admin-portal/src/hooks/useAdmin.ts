@@ -15,8 +15,10 @@ import {
   BaseProduct,
   DesignRequest,
   LedgerEntry,
+  PodColor,
   PodOrder,
   PodPrice,
+  PodVariant,
   Seller,
   ServiceItem,
   ShippingPrice,
@@ -32,6 +34,8 @@ const designReqRef = collection(db, "designRequests");
 const servicesRef = collection(db, "services");
 const productsRef = collection(db, "baseProducts");
 const podPricesRef = collection(db, "podPrices");
+const colorsRef = collection(db, "podColors");
+const variantsRef = collection(db, "podVariants");
 
 function toList<T>(snapshot: any): T[] {
   const out: T[] = [];
@@ -146,3 +150,21 @@ export function usePodPrices() {
   return { ...q, prices: toList<PodPrice>(q.data) };
 }
 export const usePodPriceMutations = crud(podPricesRef, "adm-pod-prices");
+
+/* ---------- Biến thể phôi (Sản phẩm × Màu × Size + giá) ---------- */
+export function usePodVariants() {
+  const q = useQuery(["adm-variants"], () =>
+    getDocs(query(variantsRef, orderBy("product", "asc")))
+  );
+  return { ...q, variants: toList<PodVariant>(q.data) };
+}
+export const usePodVariantMutations = crud(variantsRef, "adm-variants");
+
+/* ---------- Mã màu (tên màu phôi -> mã hex, dùng cho nền thiết kế) ---------- */
+export function usePodColors() {
+  const q = useQuery(["adm-colors"], () =>
+    getDocs(query(colorsRef, orderBy("name", "asc")))
+  );
+  return { ...q, colors: toList<PodColor>(q.data) };
+}
+export const usePodColorMutations = crud(colorsRef, "adm-colors");

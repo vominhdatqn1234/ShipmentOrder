@@ -119,6 +119,8 @@ export interface PodOrder {
   created: string;
   datePaid?: string | null;
   dateShipped?: string | null;
+  /** Trạng thái trước khi gửi Yêu cầu Hỗ trợ (để admin hủy yêu cầu trả về đúng chỗ) */
+  prevStatus?: string | null;
 }
 
 export const GOLD = "#C6A15B";

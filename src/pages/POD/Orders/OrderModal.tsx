@@ -142,10 +142,7 @@ export default function OrderModal({
   };
 
   const handleSubmit = async () => {
-    if (!order.customerName?.trim())
-      return message.error("Vui lòng nhập tên khách hàng");
-    if (!order.address1 || !order.city || !order.state || !order.zip)
-      return message.error("Vui lòng nhập đủ địa chỉ giao hàng");
+    // Thông tin liên hệ + giao hàng không bắt buộc — có thể bổ sung sau
     if (!order.items?.length || order.items.some((i) => !i.productSku))
       return message.error("Vui lòng chọn loại sản phẩm (phôi) cho mỗi món");
 
@@ -223,7 +220,7 @@ export default function OrderModal({
               ● THÔNG TIN LIÊN HỆ
             </div>
             <Input
-              placeholder="Họ và tên khách hàng *"
+              placeholder="Họ và tên khách hàng"
               value={order.customerName}
               onChange={(e) => set((d) => (d.customerName = e.target.value))}
             />
@@ -249,7 +246,7 @@ export default function OrderModal({
               ● GIAO HÀNG
             </div>
             <Input
-              placeholder="Địa chỉ 1 *"
+              placeholder="Địa chỉ 1"
               value={order.address1}
               onChange={(e) => set((d) => (d.address1 = e.target.value))}
             />
@@ -260,19 +257,19 @@ export default function OrderModal({
             />
             <div className="grid grid-cols-2 gap-3">
               <Input
-                placeholder="Thành phố *"
+                placeholder="Thành phố"
                 value={order.city}
                 onChange={(e) => set((d) => (d.city = e.target.value))}
               />
               <Input
-                placeholder="Bang/Vùng *"
+                placeholder="Bang/Vùng"
                 value={order.state}
                 onChange={(e) => set((d) => (d.state = e.target.value))}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Input
-                placeholder="Mã Zip *"
+                placeholder="Mã Zip"
                 value={order.zip}
                 onChange={(e) => set((d) => (d.zip = e.target.value))}
               />
@@ -337,7 +334,7 @@ export default function OrderModal({
                   }
                   options={products.map((p) => ({
                     value: p.sku,
-                    label: `${p.name} (${p.sku})`,
+                    label: p.name,
                   }))}
                 />
               </div>

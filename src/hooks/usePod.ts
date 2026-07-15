@@ -7,6 +7,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
@@ -25,6 +26,7 @@ import { useUser } from "../store/useUser";
 import { usePodStore } from "../store/usePodStore";
 
 const storesRef = collection(firestore, "stores");
+const colorsRef = collection(firestore, "podColors");
 const productsRef = collection(firestore, "baseProducts");
 const designsRef = collection(firestore, "designs");
 const ordersRef = collection(firestore, "podOrders");
@@ -66,6 +68,18 @@ export function useStoreMutations() {
     onSuccess: invalidate,
   });
   return { add, update, remove };
+}
+
+/* ------- Mã màu phôi (admin cấu hình): tên màu -> hex, làm nền thiết kế ------- */
+
+export function usePodColors() {
+  const q = useQuery(["pod-colors"], () => getDocs(query(colorsRef)), {
+    staleTime: 5 * 60 * 1000,
+  });
+  const colors = snapshotToList<{ id: string; name: string; hex: string }>(
+    q.data
+  );
+  return { ...q, colors };
 }
 
 /* ---------------- Base products (phôi) ---------------- */
@@ -136,16 +150,24 @@ export function useDesignMutations() {
 
 /* ---------------- Orders (theo user) ---------------- */
 
-export function usePodOrders() {
+/**
+ * Đơn của seller. Mặc định chỉ lấy đơn của store đang chọn (mỗi store có
+ * đơn riêng biệt). Truyền { allStores: true } khi cần đơn của mọi store
+ * (vd: tổng chi tiêu, trang hồ sơ).
+ */
+export function usePodOrders(opts?: { allStores?: boolean }) {
   const { user } = useUser();
+  const { selectedStoreId } = usePodStore();
   const userId = user?.id || "";
+  const byStore = !opts?.allStores && !!selectedStoreId;
   const q = useQuery(
-    ["pod-orders", userId],
+    ["pod-orders", userId, byStore ? selectedStoreId : "all"],
     () =>
       getDocs(
         query(
           ordersRef,
           where("userId", "==", userId),
+          ...(byStore ? [where("storeId", "==", selectedStoreId)] : []),
           orderBy("created", "desc")
         )
       ),
@@ -210,10 +232,45 @@ export function usePodOrderMutations() {
   return { add, addMany, update, remove, removeMany };
 }
 
-/* Tổng chi tiêu = tổng total của đơn đã thanh toán (không tính chờ thanh toán/hủy) */
+/**
+ * 3 loại phí của seller hiện tại (admin cấu hình trên bảng employee):
+ * markup (phí in thêm), perOrderFee (phí xử lý đơn), discount (ưu đãi).
+ * Fetch trực tiếp để admin đổi phí là client thấy ngay (không cần
+ * đăng nhập lại). extra = phí cộng thêm mỗi đơn = markup + XL - ưu đãi.
+ */
+export function useSellerFees() {
+  const { user } = useUser();
+  const userId = user?.id || "";
+  const q = useQuery(
+    ["pod-seller-fees", userId],
+    () => getDoc(doc(collection(firestore, "employee"), userId)),
+    { enabled: !!userId }
+  );
+  const fresh = (q.data as any)?.data?.() || {};
+  const markup = Number(fresh.markup ?? user?.markup ?? 0) || 0;
+  const perOrderFee =
+    Number(fresh.perOrderFee ?? user?.perOrderFee ?? 0) || 0;
+  const discount = Number(fresh.discount ?? user?.discount ?? 0) || 0;
+  return {
+    markup,
+    perOrderFee,
+    discount,
+    extra: markup + perOrderFee - discount,
+  };
+}
+
+/**
+ * Tổng chi tiêu = tổng total của đơn đã thanh toán (không tính chờ
+ * thanh toán/hủy) + (markup + phí XL đơn - ưu đãi) × số đơn.
+ * Giá hiển thị trên từng đơn vẫn là total gốc (vd $124), nhưng tổng
+ * chi tiêu tính đủ phí (vd 124 + 1.5 = $125.50).
+ */
 export function useTotalSpend() {
-  const { orders } = usePodOrders();
-  return orders
-    .filter((o) => !["pending_payment", "cancelled"].includes(o.status))
-    .reduce((s, o) => s + (o.total || 0), 0);
+  const { orders } = usePodOrders({ allStores: true });
+  const { extra } = useSellerFees();
+  const counted = orders.filter(
+    (o) => !["pending_payment", "cancelled"].includes(o.status)
+  );
+  const subtotal = counted.reduce((s, o) => s + (o.total || 0), 0);
+  return subtotal + extra * counted.length;
 }

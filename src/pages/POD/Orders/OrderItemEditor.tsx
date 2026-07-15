@@ -5,22 +5,66 @@ import {
   useBaseProducts,
   useDesignMutations,
   useDesigns,
+  usePodColors,
 } from "../../../hooks/usePod";
 import { PodOrder, PodOrderItem } from "../../../models/pod";
 import { imageUrlCandidates } from "../../../utils/imageUrl";
 
 
+/** Đổi tên màu của item (Black, Dark heather, Maroon...) thành màu CSS */
+const NAMED_COLORS: Record<string, string> = {
+  black: "#111827",
+  white: "#ffffff",
+  "dark heather": "#4A4A48",
+  heather: "#9ca3af",
+  "sport grey": "#C0C3C7",
+  "sport gray": "#C0C3C7",
+  "ash grey": "#E5E4E2",
+  maroon: "#6E1F2E",
+  royal: "#1D4ED8",
+  navy: "#1E2A4A",
+  red: "#C62828",
+  "irish green": "#00966E",
+  "forest green": "#1F4A2E",
+  sand: "#DCD0BA",
+  natural: "#EDE6D6",
+  purple: "#5B2D8E",
+  orange: "#E5731C",
+  gold: "#EAAA00",
+  "light blue": "#A3C7E8",
+  "light pink": "#F2C4D0",
+  charcoal: "#3C3C3C",
+};
+function colorToCss(
+  name?: string,
+  dbColors?: { name: string; hex: string }[]
+): string | undefined {
+  if (!name) return undefined;
+  const k = name.trim().toLowerCase();
+  // Ưu tiên bảng Mã màu phôi do admin cấu hình
+  const db = dbColors?.find((c) => c.name.trim().toLowerCase() === k);
+  if (db?.hex) return db.hex;
+  if (NAMED_COLORS[k]) return NAMED_COLORS[k];
+  // Tên trùng màu CSS chuẩn (red, navy, maroon, teal...) thì dùng luôn
+  if (typeof CSS !== "undefined" && CSS.supports?.("color", k)) return k;
+  return undefined;
+}
+
 function Thumb({
   url,
   tag,
   small,
+  bg,
 }: {
   url: string;
   tag: string;
   small?: boolean;
+  /** Màu nền theo màu của item (vd Black, Dark heather, Maroon) */
+  bg?: string;
 }) {
   const [idx, setIdx] = useState(0);
   const candidates = imageUrlCandidates(url);
+  const bgStyle = bg ? { background: bg } : undefined;
   const img =
     url && idx < candidates.length ? (
       <img
@@ -34,6 +78,7 @@ function Thumb({
     ) : null;
   const box = (
     <div
+      style={bgStyle}
       className={`${
         small ? "w-[34px] h-[34px]" : "w-[52px] h-[52px]"
       } shrink-0 bg-gray-50 border border-gray-200 rounded-md flex items-center justify-center overflow-hidden ${
@@ -52,7 +97,10 @@ function Thumb({
     <Popover
       title={tag}
       content={
-        <div className="w-[280px] h-[280px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+        <div
+          style={bgStyle}
+          className="w-[280px] h-[280px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden"
+        >
           <img
             src={candidates[idx]}
             alt={tag}
@@ -73,15 +121,17 @@ function ThumbLink({
   color,
   value,
   onCommit,
+  bg,
 }: {
   label: string;
   color: string;
   value: string;
   onCommit: (v: string) => void;
+  bg?: string;
 }) {
   return (
     <div className="flex items-center gap-2 border border-gray-200 rounded-lg p-1.5 bg-white">
-      <Thumb url={value} tag={label} small />
+      <Thumb url={value} tag={label} small bg={bg} />
       <div className="flex-1 min-w-0">
         <div
           className="text-[9px] font-bold tracking-wider leading-none mb-0.5"
@@ -113,6 +163,8 @@ function OrderItemEditor({
   const item = order.items[index];
   const { products } = useBaseProducts();
   const { designs } = useDesigns();
+  const { colors: podColors } = usePodColors();
+  const itemBg = colorToCss(item.color, podColors);
   const { add: addDesign, update: updateDesign } = useDesignMutations();
   const product = products.find((p) => p.sku === item.productSku);
 
@@ -224,18 +276,21 @@ function OrderItemEditor({
           <ThumbLink
             label="FRONT"
             color="#3B82F6"
+            bg={itemBg}
             value={item.frontUrl}
             onCommit={(v) => onPatchItem({ frontUrl: v })}
           />
           <ThumbLink
             label="BACK"
             color="#8B5CF6"
+            bg={itemBg}
             value={item.backUrl}
             onCommit={(v) => onPatchItem({ backUrl: v })}
           />
           <ThumbLink
             label="MOCKUP"
             color="#059669"
+            bg={itemBg}
             value={item.mockupUrl}
             onCommit={(v) => onPatchItem({ mockupUrl: v })}
           />
@@ -266,10 +321,10 @@ function OrderItemEditor({
           }}
           options={products.map((p) => ({
             value: p.sku,
-            label: `${p.name} (${p.sku})`,
+            label: p.name,
           }))}
           filterOption={(input, opt) =>
-            String(opt?.label || "")
+            `${opt?.label || ""} ${opt?.value || ""}`
               .toLowerCase()
               .includes(input.toLowerCase())
           }

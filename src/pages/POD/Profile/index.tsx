@@ -37,7 +37,7 @@ const empRef = collection(firestore, "employee");
 
 export default function Profile() {
   const { user, setUser } = useUser();
-  const { orders } = usePodOrders();
+  const { orders } = usePodOrders({ allStores: true });
   const { stores } = useStores();
   const [, setToken] = useLocalStorage("token", null);
 

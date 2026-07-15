@@ -13,10 +13,12 @@ import {
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  FiCopy,
   FiCreditCard,
   FiDownload,
   FiEdit3,
   FiFileText,
+  FiHelpCircle,
   FiList,
   FiPlus,
   FiSearch,
@@ -59,7 +61,9 @@ function StatusBadge({ status }: { status: PodOrderStatus }) {
 export default function Orders() {
   const location = useLocation();
   const { orders, isLoading } = usePodOrders();
-  const { update, remove, addMany, removeMany } = usePodOrderMutations();
+  // Khi search: tìm trên tất cả đơn của mọi cửa hàng của seller
+  const { orders: allOrders } = usePodOrders({ allStores: true });
+  const { add, update, remove, addMany, removeMany } = usePodOrderMutations();
   const { stores } = useStores();
   const { designs } = useDesigns();
   const { selectedStoreId } = usePodStore();
@@ -104,6 +108,8 @@ export default function Orders() {
     idx: number,
     patch: Partial<PodOrderItem>
   ) => {
+    // Đơn đã thanh toán -> seller không được sửa item nữa
+    if (o.status !== "pending_payment") return;
     const items = (o.items || []).map((it, i) =>
       i === idx ? { ...it, ...patch } : it
     );
@@ -125,7 +131,9 @@ export default function Orders() {
   }, [location.state]);
 
   const filtered = useMemo(() => {
-    return orders.filter((o) => {
+    // Có từ khóa -> tìm trên đơn của tất cả cửa hàng; không thì chỉ store đang chọn
+    const source = search.trim() ? allOrders : orders;
+    return source.filter((o) => {
       if (statusTab !== "all" && o.status !== statusTab) return false;
       if (
         search &&
@@ -139,7 +147,7 @@ export default function Orders() {
         return false;
       return true;
     });
-  }, [orders, statusTab, search, fromDate, toDate]);
+  }, [orders, allOrders, statusTab, search, fromDate, toDate]);
 
   const paged = useMemo(
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
@@ -176,15 +184,73 @@ export default function Orders() {
       checked ? [...prev, id] : prev.filter((x) => x !== id)
     );
 
+  // Trong số đơn đã chọn, chỉ đơn CHƯA thanh toán hoặc ĐÃ HỦY mới xóa được
+  const DELETABLE_STATUSES = ["pending_payment", "cancelled"];
+  const deletableSelectedIds = selectedIds.filter((id) => {
+    const o = allOrders.find((x) => x.id === id);
+    return o && DELETABLE_STATUSES.includes(o.status);
+  });
+
+  // Copy đơn = tạo 1 đơn MỚI dựa trên toàn bộ data của đơn gốc.
+  // Đơn mới về trạng thái Chờ thanh toán, mã dạng <mã gốc>-C1, -C2...
+  const duplicateOrder = async (o: PodOrder) => {
+    const copies = allOrders.filter((x) =>
+      x.orderCode?.startsWith(`${o.orderCode}-C`)
+    ).length;
+    const { id, ...rest } = o as any;
+    const data = {
+      ...rest,
+      orderCode: `${o.orderCode}-C${copies + 1}`,
+      status: "pending_payment",
+      created: new Date().toISOString(),
+      datePaid: null,
+      dateShipped: null,
+      tracking: "",
+      printHouse: "",
+    };
+    await add.mutateAsync(data);
+    return data.orderCode as string;
+  };
+
+  const handleDuplicate = async (o: PodOrder) => {
+    const code = await duplicateOrder(o);
+    message.success(`Đã tạo đơn mới ${code} từ đơn ${o.orderCode}`);
+  };
+
+  // Copy tất cả đơn đã chọn -> mỗi đơn 1 bản mới
+  const handleCopySelected = async () => {
+    let count = 0;
+    for (const id of selectedIds) {
+      const o = allOrders.find((x) => x.id === id);
+      if (!o) continue;
+      await duplicateOrder(o);
+      count++;
+    }
+    message.success(`Đã tạo ${count} đơn mới từ ${count} đơn đã chọn`);
+    setSelectedIds([]);
+  };
+
   const handleBulkDelete = async () => {
-    const total = selectedIds.length;
-    setDeleteProgress({ done: 0, total });
+    // Chỉ xóa được đơn chưa thanh toán — đơn đã pay bị bỏ qua
+    const deletable = deletableSelectedIds;
+    const skipped = selectedIds.length - deletable.length;
+    if (!deletable.length) {
+      message.warning(
+        "Chỉ xóa được đơn Chưa thanh toán hoặc Đã hủy"
+      );
+      return;
+    }
+    setDeleteProgress({ done: 0, total: deletable.length });
     try {
       await removeMany.mutateAsync({
-        ids: selectedIds,
+        ids: deletable,
         onProgress: (done, total) => setDeleteProgress({ done, total }),
       });
-      message.success(`Đã xóa ${total} đơn hàng`);
+      message.success(`Đã xóa ${deletable.length} đơn hàng`);
+      if (skipped)
+        message.info(
+          `Bỏ qua ${skipped} đơn đang xử lý (chỉ xóa được đơn Chưa thanh toán/Đã hủy)`
+        );
       setSelectedIds([]);
     } finally {
       setDeleteProgress(null);
@@ -216,8 +282,23 @@ export default function Orders() {
     );
   };
 
+  // Seller gửi yêu cầu hỗ trợ -> đơn chuyển trạng thái "support" để admin xử lý.
+  // Lưu prevStatus để admin "Hủy yêu cầu hỗ trợ" trả đơn về đúng trạng thái cũ.
+  const handleSupport = async (o: PodOrder) => {
+    await update.mutateAsync({
+      id: o.id,
+      status: "support",
+      prevStatus: o.status,
+    } as any);
+    message.success(`Đã gửi yêu cầu hỗ trợ cho đơn ${o.orderCode}`);
+  };
+
   const handlePay = async (o: PodOrder) => {
-    await update.mutateAsync({ id: o.id, status: "pending_approval" } as any);
+    await update.mutateAsync({
+      id: o.id,
+      status: "pending_approval",
+      datePaid: new Date().toISOString(),
+    } as any);
     message.success(`Đã thanh toán đơn ${o.orderCode} — chuyển sang Chờ duyệt`);
   };
 
@@ -479,20 +560,38 @@ export default function Orders() {
                 <b className="text-[#171826]">{selectedIds.length}</b> đơn hàng
               </span>
               <Popconfirm
-                title={`Xóa ${selectedIds.length} đơn đã chọn?`}
-                description="Hành động này không thể hoàn tác."
-                okText="Xóa tất cả"
+                title={`Copy ${selectedIds.length} đơn đã chọn?`}
+                description="Mỗi đơn sẽ được tạo 1 đơn MỚI (Chờ thanh toán) với cùng sản phẩm, thiết kế, khách hàng."
+                okText="Tạo đơn mới"
                 cancelText="Hủy"
-                okButtonProps={{ danger: true }}
-                onConfirm={handleBulkDelete}
-                disabled={!!deleteProgress}
+                onConfirm={handleCopySelected}
               >
-                <Button danger loading={removeMany.isLoading}>
-                  {deleteProgress
-                    ? `Đang xóa ${deleteProgress.done}/${deleteProgress.total}...`
-                    : `Xóa đã chọn (${selectedIds.length})`}
+                <Button
+                  icon={<FiCopy />}
+                  loading={add.isLoading}
+                  className="border-[#EADFC8] text-[#B79351] font-medium"
+                >
+                  Copy đơn ({selectedIds.length})
                 </Button>
               </Popconfirm>
+              {/* Chỉ hiện nút xóa khi trong số đã chọn có đơn CHƯA thanh toán */}
+              {deletableSelectedIds.length > 0 && (
+                <Popconfirm
+                  title={`Xóa ${deletableSelectedIds.length} đơn chưa thanh toán đã chọn?`}
+                  description="Đơn đã thanh toán sẽ được bỏ qua. Hành động này không thể hoàn tác."
+                  okText="Xóa"
+                  cancelText="Hủy"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={handleBulkDelete}
+                  disabled={!!deleteProgress}
+                >
+                  <Button danger loading={removeMany.isLoading}>
+                    {deleteProgress
+                      ? `Đang xóa ${deleteProgress.done}/${deleteProgress.total}...`
+                      : `Xóa đã chọn (${deletableSelectedIds.length})`}
+                  </Button>
+                </Popconfirm>
+              )}
               {deleteProgress ? (
                 <div className="flex items-center gap-2 min-w-[160px]">
                   <div className="flex-1 h-1.5 bg-[#F3D9D9] rounded-full overflow-hidden">
@@ -536,11 +635,10 @@ export default function Orders() {
                     />
                   </th>
                   <th className="p-3">MÃ ĐƠN</th>
-                  <th className="p-3">NGÀY LÊN ĐƠN</th>
-                  <th className="p-3">TRẠNG THÁI</th>
-                  <th className="p-3">TRACKING</th>
-                  <th className="p-3">KHÁCH HÀNG</th>
                   <th className="p-3">CHI TIẾT SẢN PHẨM & THIẾT KẾ</th>
+                  <th className="p-3">TRẠNG THÁI</th>
+                  <th className="p-3">NGÀY LÊN ĐƠN</th>
+                  <th className="p-3">TRACKING</th>
                   <th className="p-3">GIÁ</th>
                   <th className="p-3">HÀNH ĐỘNG</th>
                 </tr>
@@ -562,31 +660,44 @@ export default function Orders() {
                       />
                     </td>
                     <td className="p-3">
-                      <div className="font-extrabold text-[#171826]">
-                        {o.orderCode}
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-[#171826]">
+                          {o.orderCode}
+                        </span>
+                        <Popconfirm
+                          title={`Copy đơn ${o.orderCode}?`}
+                          description="Tạo 1 đơn MỚI (Chờ thanh toán) với cùng sản phẩm, thiết kế, khách hàng."
+                          okText="Tạo đơn mới"
+                          cancelText="Hủy"
+                          onConfirm={() => handleDuplicate(o)}
+                        >
+                          <Tooltip title="Copy đơn — tạo đơn mới từ data đơn này">
+                            <button className="w-6 h-6 rounded-md border border-gray-200 bg-white text-gray-400 inline-flex items-center justify-center cursor-pointer hover:text-[#B79351] hover:border-[#EADFC8] shrink-0">
+                              <FiCopy size={12} />
+                            </button>
+                          </Tooltip>
+                        </Popconfirm>
                       </div>
                       <span className="inline-flex items-center gap-1 text-[10px] bg-gray-100 rounded px-1.5 py-0.5 text-gray-500 mt-1">
                         🏪 {o.storeName || "—"}
                       </span>
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                      {dayjs(o.created).format("DD/MM/YYYY")}
-                    </td>
-                    <td className="p-3">
-                      <StatusBadge status={o.status} />
+                      <div className="text-xs text-gray-500 font-semibold mt-1">
+                        Khách: {o.customerName || "—"}
+                      </div>
                     </td>
                     <td className="p-3">
-                      {o.tracking ? (
-                        <span className="text-[#2563EB]">{o.tracking}</span>
-                      ) : (
-                        <span className="text-gray-400 italic">Chưa có</span>
-                      )}
-                    </td>
-                    <td className="p-3 font-bold text-[#171826]">
-                      {o.customerName}
-                    </td>
-                    <td className="p-3">
-                      <div className="space-y-2">
+                      <div
+                        className={
+                          o.status !== "pending_payment"
+                            ? "space-y-2 pointer-events-none opacity-75 select-none"
+                            : "space-y-2"
+                        }
+                        title={
+                          o.status !== "pending_payment"
+                            ? "Đơn đã thanh toán — không thể chỉnh sửa"
+                            : undefined
+                        }
+                      >
                         {(o.items || []).map((_, idx) => (
                           <OrderItemEditor
                             key={idx}
@@ -599,20 +710,41 @@ export default function Orders() {
                         ))}
                       </div>
                     </td>
+                    <td className="p-3">
+                      <StatusBadge status={o.status} />
+                    </td>
+                    <td className="p-3 whitespace-nowrap">
+                      {dayjs(o.created).format("DD/MM/YYYY")}
+                    </td>
+                    <td className="p-3">
+                      {o.tracking ? (
+                        <span className="text-[#2563EB]">{o.tracking}</span>
+                      ) : (
+                        <span className="text-gray-400 italic">Chưa có</span>
+                      )}
+                    </td>
                     <td className="p-3 font-extrabold text-[#171826] whitespace-nowrap">
                       ${(o.total || 0).toFixed(2)}
                     </td>
                     <td className="p-3">
                       <div className="flex flex-col gap-2">
                         <div className="flex gap-1.5">
-                          <Tooltip title="Sửa chi tiết đơn (khách hàng, địa chỉ giao hàng, ghi chú...)">
-                            <button
-                              onClick={() => setEditing(o)}
-                              className="w-8 h-8 rounded-lg border border-[#EADFC8] bg-[#FBF6EC] text-[#B79351] flex items-center justify-center cursor-pointer hover:bg-[#C6A15B] hover:text-white transition-colors"
-                            >
-                              <FiEdit3 size={14} />
-                            </button>
-                          </Tooltip>
+                          {o.status === "pending_payment" ? (
+                            <Tooltip title="Sửa chi tiết đơn (khách hàng, địa chỉ giao hàng, ghi chú...)">
+                              <button
+                                onClick={() => setEditing(o)}
+                                className="w-8 h-8 rounded-lg border border-[#EADFC8] bg-[#FBF6EC] text-[#B79351] flex items-center justify-center cursor-pointer hover:bg-[#C6A15B] hover:text-white transition-colors"
+                              >
+                                <FiEdit3 size={14} />
+                              </button>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Đơn đã thanh toán — không thể chỉnh sửa/xóa">
+                              <button className="w-8 h-8 rounded-lg border border-gray-200 bg-gray-50 text-gray-300 flex items-center justify-center cursor-not-allowed">
+                                <FiEdit3 size={14} />
+                              </button>
+                            </Tooltip>
+                          )}
                           {o.status === "pending_payment" && (
                             <Popconfirm
                               title={`Thanh toán đơn ${o.orderCode}?`}
@@ -628,7 +760,9 @@ export default function Orders() {
                               </Tooltip>
                             </Popconfirm>
                           )}
-                          {o.status === "pending_payment" && (
+                          {["pending_payment", "cancelled"].includes(
+                            o.status
+                          ) && (
                             <Popconfirm
                               title={`Xóa đơn ${o.orderCode}?`}
                               description="Hành động này không thể hoàn tác."
@@ -644,6 +778,23 @@ export default function Orders() {
                               </Tooltip>
                             </Popconfirm>
                           )}
+                          {!["pending_payment", "cancelled", "support"].includes(
+                            o.status
+                          ) && (
+                            <Popconfirm
+                              title={`Yêu cầu hỗ trợ cho đơn ${o.orderCode}?`}
+                              description="Đơn sẽ chuyển sang trạng thái Yêu cầu Hỗ trợ để admin xử lý."
+                              okText="Gửi yêu cầu"
+                              cancelText="Hủy"
+                              onConfirm={() => handleSupport(o)}
+                            >
+                              <Tooltip title="Yêu cầu hỗ trợ cho đơn này">
+                                <button className="w-8 h-8 rounded-lg border border-orange-200 bg-orange-50 text-orange-500 flex items-center justify-center cursor-pointer hover:bg-orange-500 hover:text-white transition-colors">
+                                  <FiHelpCircle size={14} />
+                                </button>
+                              </Tooltip>
+                            </Popconfirm>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -651,7 +802,7 @@ export default function Orders() {
                 ))}
                 {!filtered.length && (
                   <tr>
-                    <td colSpan={9} className="p-16 text-center text-gray-400">
+                    <td colSpan={8} className="p-16 text-center text-gray-400">
                       {isLoading ? "Đang tải..." : "Không có đơn hàng nào"}
                     </td>
                   </tr>
