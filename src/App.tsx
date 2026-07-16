@@ -1,7 +1,6 @@
 import React, { Suspense } from "react";
 import { ConfigProvider } from "antd";
 import {
-  // Navigate,
   // Outlet,
   // Route,
   useRoutes,
