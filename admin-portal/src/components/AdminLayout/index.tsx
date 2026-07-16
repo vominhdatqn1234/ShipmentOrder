@@ -9,6 +9,7 @@ import {
   FiTag,
   FiTruck,
   FiPenTool,
+  FiPrinter,
   FiSettings,
   FiSearch,
   FiSidebar,
@@ -25,6 +26,7 @@ const EXTENSIONS = [
   { to: "/app/pod-prices", label: "Bảng giá POD", icon: <FiTag /> },
   { to: "/app/shipping-prices", label: "Bảng giá Vận chuyển", icon: <FiTruck /> },
   { to: "/app/design-orders", label: "Đơn Thiết Kế", icon: <FiPenTool /> },
+  { to: "/app/print-house", label: "Nhà In", icon: <FiPrinter /> },
 ];
 
 export default function AdminLayout() {

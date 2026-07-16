@@ -19,6 +19,7 @@ import {
   PodOrder,
   PodPrice,
   PodVariant,
+  PrintOrder,
   Seller,
   ServiceItem,
   ShippingPrice,
@@ -36,6 +37,7 @@ const productsRef = collection(db, "baseProducts");
 const podPricesRef = collection(db, "podPrices");
 const colorsRef = collection(db, "podColors");
 const variantsRef = collection(db, "podVariants");
+const printOrdersRef = collection(db, "printOrders");
 
 function toList<T>(snapshot: any): T[] {
   const out: T[] = [];
@@ -150,6 +152,15 @@ export function usePodPrices() {
   return { ...q, prices: toList<PodPrice>(q.data) };
 }
 export const usePodPriceMutations = crud(podPricesRef, "adm-pod-prices");
+
+/* ---------- Đơn gửi Nhà In (định dạng AK2) ---------- */
+export function usePrintOrders() {
+  const q = useQuery(["adm-print-orders"], () =>
+    getDocs(query(printOrdersRef, orderBy("created", "desc")))
+  );
+  return { ...q, printOrders: toList<PrintOrder>(q.data) };
+}
+export const usePrintOrderMutations = crud(printOrdersRef, "adm-print-orders");
 
 /* ---------- Biến thể phôi (Sản phẩm × Màu × Size + giá) ---------- */
 export function usePodVariants() {

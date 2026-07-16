@@ -64,7 +64,9 @@ function Thumb({
 }) {
   const [idx, setIdx] = useState(0);
   const candidates = imageUrlCandidates(url);
-  const bgStyle = bg ? { background: bg } : undefined;
+  // Có màu item -> nền + viền theo màu, thêm padding để màu luôn lộ ra
+  // thành khung quanh ảnh (kể cả ảnh JPEG đặc phủ kín ô)
+  const bgStyle = bg ? { background: bg, borderColor: bg } : undefined;
   const img =
     url && idx < candidates.length ? (
       <img
@@ -72,7 +74,7 @@ function Thumb({
         src={candidates[idx]}
         alt={tag}
         referrerPolicy="no-referrer"
-        className="w-full h-full object-contain"
+        className="w-full h-full object-contain rounded-[3px]"
         onError={() => setIdx((i) => i + 1)}
       />
     ) : null;
@@ -81,12 +83,16 @@ function Thumb({
       style={bgStyle}
       className={`${
         small ? "w-[34px] h-[34px]" : "w-[52px] h-[52px]"
-      } shrink-0 bg-gray-50 border border-gray-200 rounded-md flex items-center justify-center overflow-hidden ${
+      } ${bg ? "p-[3px]" : ""} shrink-0 bg-gray-50 border border-gray-200 rounded-md flex items-center justify-center overflow-hidden ${
         img ? "cursor-zoom-in" : ""
       }`}
     >
       {img || (
-        <span className="text-[7px] font-bold text-gray-300 tracking-wider">
+        <span
+          className={`text-[7px] font-bold tracking-wider ${
+            bg ? "text-white/80" : "text-gray-300"
+          }`}
+        >
           {small ? "—" : tag}
         </span>
       )}
@@ -99,13 +105,15 @@ function Thumb({
       content={
         <div
           style={bgStyle}
-          className="w-[280px] h-[280px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden"
+          className={`w-[280px] h-[280px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden ${
+            bg ? "p-2" : ""
+          }`}
         >
           <img
             src={candidates[idx]}
             alt={tag}
             referrerPolicy="no-referrer"
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full object-contain rounded"
           />
         </div>
       }

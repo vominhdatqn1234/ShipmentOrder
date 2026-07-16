@@ -33,11 +33,13 @@ import {
   useBaseProducts,
   useOrderMutations,
   useOrders,
+  usePodColors,
   useSellerMutations,
   useSellers,
   useStoreMutations,
   useStores,
 } from "../../hooks/useAdmin";
+import { DEFAULT_COLOR_HEX } from "../../lib/colorHex";
 import { ORDER_STATUS, PodOrder, Seller } from "../../models/admin";
 import { downloadCSV, parseCSV, toCSV } from "../../lib/csvPod";
 import { toDirectImageUrl } from "../../lib/imageUrl";
@@ -61,9 +63,17 @@ export default function Sellers() {
   const { stores } = useStores();
   const { orders } = useOrders();
   const { products } = useBaseProducts();
+  const { colors: podColors } = usePodColors();
   // Tên phôi trong Kho Phôi POD theo SKU (vd TM-000-16 -> T-Shirt Comfort)
   const blankName = (sku?: string) =>
     products.find((p) => p.sku === sku)?.name || sku || "Unknown";
+  // Màu item -> hex làm nền thiết kế (ưu tiên bảng Mã màu phôi)
+  const colorCss = (name?: string): string | undefined => {
+    if (!name) return undefined;
+    const k = name.trim().toLowerCase();
+    const db = podColors.find((c) => c.name.trim().toLowerCase() === k);
+    return db?.hex || DEFAULT_COLOR_HEX[k] || undefined;
+  };
   const sellerMut = useSellerMutations();
   const storeMut = useStoreMutations();
   const orderMut = useOrderMutations();
@@ -853,26 +863,43 @@ export default function Sellers() {
                               </Tooltip>
                             );
                           }
+                          // Nền + khung theo màu của item (vd Maroon)
+                          const bg = colorCss(it?.color);
+                          const bgStyle = bg
+                            ? { background: bg, borderColor: bg }
+                            : undefined;
                           return (
                             <Popover
                               placement="right"
                               content={
-                                <div className="w-[260px] h-[260px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+                                <div
+                                  style={bgStyle}
+                                  className={`w-[260px] h-[260px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden ${
+                                    bg ? "p-2" : ""
+                                  }`}
+                                >
                                   <img
                                     src={toDirectImageUrl(img)}
                                     alt="design"
                                     referrerPolicy="no-referrer"
-                                    className="max-w-full max-h-full object-contain"
+                                    className="max-w-full max-h-full object-contain rounded"
                                   />
                                 </div>
                               }
                             >
-                              <img
-                                src={toDirectImageUrl(img)}
-                                alt="design"
-                                referrerPolicy="no-referrer"
-                                className="w-9 h-9 rounded-md object-cover border border-gray-200 bg-gray-50 cursor-zoom-in"
-                              />
+                              <span
+                                style={bgStyle}
+                                className={`inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-200 bg-gray-50 cursor-zoom-in overflow-hidden ${
+                                  bg ? "p-[3px]" : ""
+                                }`}
+                              >
+                                <img
+                                  src={toDirectImageUrl(img)}
+                                  alt="design"
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover rounded-[3px]"
+                                />
+                              </span>
                             </Popover>
                           );
                         })()}
