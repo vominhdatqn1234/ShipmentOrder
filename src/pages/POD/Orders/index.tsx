@@ -21,14 +21,17 @@ import {
   FiHelpCircle,
   FiList,
   FiPlus,
+  FiRotateCcw,
   FiSearch,
   FiTrash2,
+  FiTruck,
 } from "react-icons/fi";
 import { useLocation } from "react-router-dom";
 import {
   useDesigns,
   usePodOrderMutations,
   usePodOrders,
+  usePodVariants,
   useStores,
 } from "../../../hooks/usePod";
 import {
@@ -36,13 +39,19 @@ import {
   POD_STATUS_TABS,
   PodOrder,
   PodOrderStatus,
+  findVariant,
 } from "../../../models/pod";
 import { usePodStore } from "../../../store/usePodStore";
 import { downloadCSV, parseCSV, parseVariations, toCSV } from "../../../utils/csvPod";
 import OrderItemEditor from "./OrderItemEditor";
 import OrderModal from "./OrderModal";
 import { useAccountGuard } from "../../../hooks/useAccountGuard";
-import { PodOrderItem } from "../../../models/pod";
+import {
+  PodOrderItem,
+  SPECIAL_PRINT_AREA_FEE,
+  SPECIAL_PRINT_AREA_LABEL,
+  podItemTotal,
+} from "../../../models/pod";
 
 type ViewTab = "list" | "import" | "create";
 
@@ -66,7 +75,12 @@ export default function Orders() {
   const { add, update, remove, addMany, removeMany } = usePodOrderMutations();
   const { stores } = useStores();
   const { designs } = useDesigns();
+  const { variants } = usePodVariants();
   const { selectedStoreId } = usePodStore();
+  // Phụ phí vùng in đặc biệt lấy theo bảng giá phôi POD (In vùng phụ)
+  const specialFee = (it: PodOrderItem) =>
+    findVariant(variants, it.productSku, it.size, it.color)?.printExtraArea ??
+    SPECIAL_PRINT_AREA_FEE;
   const { ensureAccount } = useAccountGuard();
   // Chặn tạo đơn/import khi chưa có shop hoặc shop đang bị khóa
   const selectedStore = stores.find((s) => s.id === selectedStoreId);
@@ -113,10 +127,8 @@ export default function Orders() {
     const items = (o.items || []).map((it, i) =>
       i === idx ? { ...it, ...patch } : it
     );
-    const total = items.reduce(
-      (s, i) => s + (i.price || 0) * (i.quantity || 1),
-      0
-    );
+    // Tổng gồm cả phụ phí vùng in đặc biệt (+$2/sp)
+    const total = items.reduce((s, i) => s + podItemTotal(i), 0);
     update.mutate({ id: o.id, items, total } as any);
   };
 
@@ -191,17 +203,41 @@ export default function Orders() {
     return o && DELETABLE_STATUSES.includes(o.status);
   });
 
+  // Chỉ hoàn tiền được đơn đã bấm Pay (có datePaid) và chưa ở tab Hoàn tiền/Đã hủy
+  const refundableSelectedIds = selectedIds.filter((id) => {
+    const o = allOrders.find((x) => x.id === id);
+    return (
+      o &&
+      !!o.datePaid &&
+      !["refund", "cancelled", "pending_payment"].includes(o.status)
+    );
+  });
+
   // Copy đơn = tạo 1 đơn MỚI dựa trên toàn bộ data của đơn gốc.
-  // Đơn mới về trạng thái Chờ thanh toán, mã dạng <mã gốc>-C1, -C2...
-  const duplicateOrder = async (o: PodOrder) => {
+  // Đơn mới LUÔN về 0đ (giá từng sản phẩm = 0, tổng = 0) — khách chỉ trả khi tự bấm Pay.
+  // - Copy thường: trạng thái Chờ thanh toán, mã <mã gốc>-C1, -C2...
+  // - Hỗ trợ ship lại: trạng thái Đơn Reship, mã <mã gốc>-RS1, -RS2...
+  const duplicateOrder = async (
+    o: PodOrder,
+    opts: { status?: PodOrderStatus; prefix?: string } = {}
+  ) => {
+    const { status = "pending_payment", prefix = "C" } = opts;
     const copies = allOrders.filter((x) =>
-      x.orderCode?.startsWith(`${o.orderCode}-C`)
+      x.orderCode?.startsWith(`${o.orderCode}-${prefix}`)
     ).length;
     const { id, ...rest } = o as any;
+    // Đơn copy/ship lại về 0đ: reset giá từng item và tổng đơn
+    const items = (o.items || []).map((it) => ({
+      ...it,
+      price: 0,
+      itemTotal: 0,
+    }));
     const data = {
       ...rest,
-      orderCode: `${o.orderCode}-C${copies + 1}`,
-      status: "pending_payment",
+      items,
+      total: 0,
+      orderCode: `${o.orderCode}-${prefix}${copies + 1}`,
+      status,
       created: new Date().toISOString(),
       datePaid: null,
       dateShipped: null,
@@ -214,10 +250,10 @@ export default function Orders() {
 
   const handleDuplicate = async (o: PodOrder) => {
     const code = await duplicateOrder(o);
-    message.success(`Đã tạo đơn mới ${code} từ đơn ${o.orderCode}`);
+    message.success(`Đã tạo đơn mới ${code} (0đ) từ đơn ${o.orderCode}`);
   };
 
-  // Copy tất cả đơn đã chọn -> mỗi đơn 1 bản mới
+  // Copy tất cả đơn đã chọn -> mỗi đơn 1 bản mới (0đ)
   const handleCopySelected = async () => {
     let count = 0;
     for (const id of selectedIds) {
@@ -226,9 +262,68 @@ export default function Orders() {
       await duplicateOrder(o);
       count++;
     }
-    message.success(`Đã tạo ${count} đơn mới từ ${count} đơn đã chọn`);
+    message.success(`Đã tạo ${count} đơn mới (0đ) từ ${count} đơn đã chọn`);
     setSelectedIds([]);
   };
+
+  // Hỗ trợ ship lại = tạo 1 đơn Reship MỚI về 0đ từ đơn gốc
+  const handleReship = async (o: PodOrder) => {
+    const code = await duplicateOrder(o, { status: "reship", prefix: "RS" });
+    message.success(`Đã tạo đơn ship lại ${code} (0đ) từ đơn ${o.orderCode}`);
+  };
+
+  const handleReshipSelected = async () => {
+    let count = 0;
+    for (const id of selectedIds) {
+      const o = allOrders.find((x) => x.id === id);
+      if (!o) continue;
+      await duplicateOrder(o, { status: "reship", prefix: "RS" });
+      count++;
+    }
+    message.success(`Đã tạo ${count} đơn ship lại (0đ) từ ${count} đơn đã chọn`);
+    setSelectedIds([]);
+  };
+
+  // Khách bấm Hoàn tiền -> đơn chuyển sang tab Hoàn tiền để cuối tháng trừ lại.
+  // Lưu prevStatus để admin có thể trả đơn về đúng trạng thái cũ.
+  const handleRefund = async (o: PodOrder) => {
+    await update.mutateAsync({
+      id: o.id,
+      status: "refund",
+      prevStatus: o.status,
+      // Giá hiển thị về 0đ nhưng lưu lại số tiền đã hoàn để thống kê refund
+      refundedAmount: o.total || 0,
+      refundedAt: new Date().toISOString(),
+    } as any);
+    message.success(
+      `Đã chuyển đơn ${o.orderCode} sang Hoàn tiền (hoàn $${(o.total || 0).toFixed(2)})`
+    );
+  };
+
+  // Hoàn tiền hàng loạt — chỉ áp dụng cho các đơn đã bấm Pay
+  const handleRefundSelected = async () => {
+    let count = 0;
+    for (const id of refundableSelectedIds) {
+      const o = allOrders.find((x) => x.id === id);
+      if (!o) continue;
+      await update.mutateAsync({
+        id: o.id,
+        status: "refund",
+        prevStatus: o.status,
+        refundedAmount: o.total || 0,
+        refundedAt: new Date().toISOString(),
+      } as any);
+      count++;
+    }
+    message.success(`Đã chuyển ${count} đơn sang Hoàn tiền`);
+    setSelectedIds([]);
+  };
+
+  // Giá hiển thị: khách chưa bấm Pay (chưa có datePaid) -> 0đ;
+  // đơn đã hoàn tiền -> 0đ (số tiền đã hoàn lưu ở refundedAmount để thống kê);
+  // còn lại đã thanh toán mới hiện số tiền thật của đơn.
+  const displayTotal = (o: PodOrder) =>
+    o.status === "refund" ? 0 : o.datePaid ? o.total || 0 : 0;
 
   const handleBulkDelete = async () => {
     // Chỉ xóa được đơn chưa thanh toán — đơn đã pay bị bỏ qua
@@ -392,7 +487,7 @@ export default function Orders() {
           i === idx ? { ...it, ...patch } : it
         );
         const total = items.reduce(
-          (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1),
+          (s: number, i: any) => s + podItemTotal(i),
           0
         );
         return { ...r, data: { ...r.data, items, total } };
@@ -574,6 +669,39 @@ export default function Orders() {
                   Copy đơn ({selectedIds.length})
                 </Button>
               </Popconfirm>
+              <Popconfirm
+                title={`Hỗ trợ ship lại ${selectedIds.length} đơn đã chọn?`}
+                description="Mỗi đơn sẽ được tạo 1 đơn Reship MỚI về 0đ với cùng sản phẩm, thiết kế, khách hàng."
+                okText="Tạo đơn ship lại"
+                cancelText="Hủy"
+                onConfirm={handleReshipSelected}
+              >
+                <Button
+                  icon={<FiTruck />}
+                  loading={add.isLoading}
+                  className="border-[#C7D2FE] text-[#4338CA] font-medium"
+                >
+                  Hỗ trợ ship lại ({selectedIds.length})
+                </Button>
+              </Popconfirm>
+              {/* Chỉ hiện nút hoàn tiền khi trong số đã chọn có đơn ĐÃ thanh toán */}
+              {refundableSelectedIds.length > 0 && (
+                <Popconfirm
+                  title={`Hoàn tiền ${refundableSelectedIds.length} đơn đã chọn?`}
+                  description="Đơn chưa thanh toán sẽ được bỏ qua. Các đơn sẽ chuyển sang tab Hoàn tiền để cuối tháng trừ lại."
+                  okText="Hoàn tiền"
+                  cancelText="Hủy"
+                  onConfirm={handleRefundSelected}
+                >
+                  <Button
+                    icon={<FiRotateCcw />}
+                    loading={update.isLoading}
+                    className="border-[#FBCFE8] text-[#BE123C] font-medium"
+                  >
+                    Hoàn tiền ({refundableSelectedIds.length})
+                  </Button>
+                </Popconfirm>
+              )}
               {/* Chỉ hiện nút xóa khi trong số đã chọn có đơn CHƯA thanh toán */}
               {deletableSelectedIds.length > 0 && (
                 <Popconfirm
@@ -636,6 +764,7 @@ export default function Orders() {
                   </th>
                   <th className="p-3">MÃ ĐƠN</th>
                   <th className="p-3">CHI TIẾT SẢN PHẨM & THIẾT KẾ</th>
+                  <th className="p-3">VÙNG IN</th>
                   <th className="p-3">TRẠNG THÁI</th>
                   <th className="p-3">NGÀY LÊN ĐƠN</th>
                   <th className="p-3">TRACKING</th>
@@ -711,6 +840,51 @@ export default function Orders() {
                       </div>
                     </td>
                     <td className="p-3">
+                      {/* Vùng in cho từng sản phẩm — đặc biệt +$2/sp */}
+                      <div
+                        className={
+                          o.status !== "pending_payment"
+                            ? "space-y-2 pointer-events-none opacity-75"
+                            : "space-y-2"
+                        }
+                      >
+                        {(o.items || []).map((it, idx) => (
+                          <div key={idx}>
+                            {(o.items?.length || 0) > 1 && (
+                              <div className="text-[9px] font-bold text-gray-400 mb-0.5">
+                                SP{idx + 1}
+                              </div>
+                            )}
+                            <Select
+                              size="small"
+                              className="w-[150px]"
+                              value={it.printArea === "special" ? "special" : ""}
+                              onChange={(v) =>
+                                patchOrderItem(o, idx, { printArea: v })
+                              }
+                              options={[
+                                { value: "", label: "Mặc định" },
+                                {
+                                  value: "special",
+                                  label: `${SPECIAL_PRINT_AREA_LABEL} (+$${specialFee(
+                                    it
+                                  )})`,
+                                },
+                              ]}
+                            />
+                            {it.printArea === "special" && (
+                              <div className="text-orange-600 text-[11px] font-bold mt-0.5">
+                                +${(specialFee(it) * (it.quantity || 1)).toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {!o.items?.length && (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3">
                       <StatusBadge status={o.status} />
                     </td>
                     <td className="p-3 whitespace-nowrap">
@@ -724,7 +898,7 @@ export default function Orders() {
                       )}
                     </td>
                     <td className="p-3 font-extrabold text-[#171826] whitespace-nowrap">
-                      ${(o.total || 0).toFixed(2)}
+                      ${displayTotal(o).toFixed(2)}
                     </td>
                     <td className="p-3">
                       <div className="flex flex-col gap-2">
@@ -795,6 +969,40 @@ export default function Orders() {
                               </Tooltip>
                             </Popconfirm>
                           )}
+                          {!["pending_payment", "cancelled", "reship", "refund"].includes(
+                            o.status
+                          ) && (
+                            <Popconfirm
+                              title={`Hỗ trợ ship lại đơn ${o.orderCode}?`}
+                              description="Tạo 1 đơn Reship MỚI về 0đ với cùng sản phẩm, thiết kế, khách hàng."
+                              okText="Tạo đơn ship lại"
+                              cancelText="Hủy"
+                              onConfirm={() => handleReship(o)}
+                            >
+                              <Tooltip title="Hỗ trợ ship lại — tạo đơn reship 0đ">
+                                <button className="w-8 h-8 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-500 flex items-center justify-center cursor-pointer hover:bg-indigo-500 hover:text-white transition-colors">
+                                  <FiTruck size={14} />
+                                </button>
+                              </Tooltip>
+                            </Popconfirm>
+                          )}
+                          {!["pending_payment", "cancelled", "refund"].includes(
+                            o.status
+                          ) && (
+                            <Popconfirm
+                              title={`Chuyển đơn ${o.orderCode} sang Hoàn tiền?`}
+                              description="Đơn sẽ chuyển sang tab Hoàn tiền để cuối tháng trừ lại."
+                              okText="Hoàn tiền"
+                              cancelText="Hủy"
+                              onConfirm={() => handleRefund(o)}
+                            >
+                              <Tooltip title="Hoàn tiền / hoàn trả đơn này">
+                                <button className="w-8 h-8 rounded-lg border border-rose-200 bg-rose-50 text-rose-500 flex items-center justify-center cursor-pointer hover:bg-rose-500 hover:text-white transition-colors">
+                                  <FiRotateCcw size={14} />
+                                </button>
+                              </Tooltip>
+                            </Popconfirm>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -802,7 +1010,7 @@ export default function Orders() {
                 ))}
                 {!filtered.length && (
                   <tr>
-                    <td colSpan={8} className="p-16 text-center text-gray-400">
+                    <td colSpan={9} className="p-16 text-center text-gray-400">
                       {isLoading ? "Đang tải..." : "Không có đơn hàng nào"}
                     </td>
                   </tr>

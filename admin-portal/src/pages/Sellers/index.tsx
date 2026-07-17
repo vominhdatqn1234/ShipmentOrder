@@ -55,6 +55,7 @@ const STATUS_TABS = [
   { key: "completed", label: "Hoàn thành" },
   { key: "support", label: "Yêu cầu Hỗ trợ" },
   { key: "reship", label: "Đơn Reship (RS)" },
+  { key: "refund", label: "Hoàn tiền" },
   { key: "all", label: "Tất cả đơn" },
 ];
 
@@ -208,9 +209,14 @@ export default function Sellers() {
     downloadCSV(
       filename,
       toCSV(
-        ["Order ID", "Status", "Shop", "Customer", "Date", "Paid", "Tracking", "Price", "Markup", "Order Fee", "Discount", "Total"],
+        ["Order ID", "Status", "Shop", "Customer", "Date", "Paid", "Tracking", "Print Area", "Price", "Markup", "Order Fee", "Discount", "Total"],
         list.map((o) => {
           const f = feesOf(o.userId);
+          const printArea = (o.items || []).some(
+            (it) => it.printArea === "special"
+          )
+            ? "Vùng in đặc biệt"
+            : "Mặc định";
           return [
             o.orderCode,
             ORDER_STATUS[o.status]?.label || o.status,
@@ -219,6 +225,7 @@ export default function Sellers() {
             dayjs(o.created).format("DD/MM/YYYY"),
             o.datePaid ? dayjs(o.datePaid).format("DD/MM/YYYY") : "Chưa thanh toán",
             o.tracking || "",
+            printArea,
             (o.total || 0).toFixed(2),
             f.markup.toFixed(2),
             f.perOrderFee.toFixed(2),
@@ -417,6 +424,9 @@ export default function Sellers() {
       frontMockupUrl: it.mockupUrl || "",
       backDesignUrl: it.backUrl || "",
       backMockupUrl: it.backUrl ? it.mockupUrl || "" : "",
+      // Vùng in -> ghi vào Front Print Size của phiếu in
+      frontPrintSize:
+        it.printArea === "special" ? "Vùng in đặc biệt" : "Mặc định",
       note: it.note || o.note || "",
       printHouse,
       created: new Date().toISOString(),
@@ -777,6 +787,7 @@ export default function Sellers() {
                   <th className="p-3 font-bold text-[#2563EB]">
                     Phôi Fulfill
                   </th>
+                  <th className="p-3 font-medium">Vùng in</th>
                   <th className="p-3 font-medium">Thiết kế</th>
                   <th className="p-3 font-medium">Nhà In</th>
                   <th className="p-3 font-medium">Tracking</th>
@@ -906,6 +917,28 @@ export default function Sellers() {
                         </div>
                       </td>
                       <td className="p-3">
+                        <div className="space-y-1.5">
+                          {(o.items || []).map((it, i) =>
+                            it.printArea === "special" ? (
+                              <div key={i}>
+                                <span className="bg-orange-50 border border-orange-200 text-orange-600 text-[11px] font-bold rounded-md px-2 py-1 whitespace-nowrap">
+                                  Đặc biệt +$2
+                                </span>
+                              </div>
+                            ) : (
+                              <div key={i}>
+                                <span className="text-gray-400 text-[11px] whitespace-nowrap">
+                                  Mặc định
+                                </span>
+                              </div>
+                            )
+                          )}
+                          {!o.items?.length && (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3">
                         {(() => {
                           const it = o.items?.[0];
                           const img =
@@ -1007,30 +1040,21 @@ export default function Sellers() {
                         />
                       </td>
                       <td className="p-3">
-                        {o.status === "shipping" ? (
-                          <Input
-                            key={o.tracking || ""}
-                            size="small"
-                            placeholder="Nhập mã tracking..."
-                            defaultValue={o.tracking || ""}
-                            className="w-[150px]"
-                            onPressEnter={(e) =>
-                              (e.target as HTMLInputElement).blur()
-                            }
-                            onBlur={(e) => {
-                              const v = e.target.value.trim();
-                              if (v !== (o.tracking || "")) saveTracking(o, v);
-                            }}
-                          />
-                        ) : o.tracking ? (
-                          <span className="text-[#2563EB] text-xs">
-                            {o.tracking}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic text-xs">
-                            Chưa có
-                          </span>
-                        )}
+                        {/* Cho sửa tracking ở MỌI trạng thái đơn */}
+                        <Input
+                          key={o.tracking || ""}
+                          size="small"
+                          placeholder="Nhập mã tracking..."
+                          defaultValue={o.tracking || ""}
+                          className="w-[150px]"
+                          onPressEnter={(e) =>
+                            (e.target as HTMLInputElement).blur()
+                          }
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v !== (o.tracking || "")) saveTracking(o, v);
+                          }}
+                        />
                       </td>
                       <td className="p-3 text-right font-semibold whitespace-nowrap">
                         {money(o.total)}
@@ -1106,7 +1130,7 @@ export default function Sellers() {
                 })}
                 {!paged.length && (
                   <tr>
-                    <td colSpan={14} className="p-12 text-center text-gray-400">
+                    <td colSpan={15} className="p-12 text-center text-gray-400">
                       Không có đơn hàng nào
                     </td>
                   </tr>

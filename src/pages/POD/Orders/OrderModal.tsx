@@ -2,12 +2,19 @@ import { Button, Input, InputNumber, Modal, Select, message } from "antd";
 import { produce } from "immer";
 import { useEffect, useState } from "react";
 import {
-  useBaseProducts,
   useDesigns,
   usePodOrderMutations,
+  usePodVariants,
   useStores,
 } from "../../../hooks/usePod";
-import { POD_STATUS, PodOrder, PodOrderItem } from "../../../models/pod";
+import {
+  POD_STATUS,
+  PodOrder,
+  PodOrderItem,
+  findVariant,
+  podItemTotal,
+  variantUnitPrice,
+} from "../../../models/pod";
 import { useAccountGuard } from "../../../hooks/useAccountGuard";
 import { usePodStore } from "../../../store/usePodStore";
 import { toDirectImageUrl } from "../../../utils/imageUrl";
@@ -99,7 +106,7 @@ export default function OrderModal({
   onClose: () => void;
 }) {
   const isEdit = !!initial;
-  const { products } = useBaseProducts();
+  const { variants } = usePodVariants();
   const { designs } = useDesigns();
   const { stores } = useStores();
   const { selectedStoreId } = usePodStore();
@@ -126,6 +133,57 @@ export default function OrderModal({
       })
     );
 
+  // Danh mục phôi từ Bảng giá phôi POD (admin) — sắp xếp A→Z cho dễ tìm
+  const productNames = Array.from(
+    new Set(variants.map((v) => v.product?.trim()).filter(Boolean) as string[])
+  ).sort((a, b) => a.localeCompare(b));
+  const colorsOf = (product?: string) =>
+    Array.from(
+      new Set(
+        variants
+          .filter((v) => v.product === product)
+          .map((v) => (v.color || "").trim())
+          .filter(Boolean)
+      )
+    );
+  const sizesOf = (product?: string) =>
+    Array.from(
+      new Set(
+        variants
+          .filter((v) => v.product === product)
+          .map((v) => (v.size || "").trim())
+          .filter(Boolean)
+      )
+    );
+
+  // Tự tính đơn giá từng món theo bảng giá phôi POD (chỉ khi khớp biến thể)
+  useEffect(() => {
+    if (!variants.length) return;
+    setOrder((prev) =>
+      produce(prev, (d) => {
+        (d.items || []).forEach((it: PodOrderItem) => {
+          const v = findVariant(variants, it.productSku, it.size, it.color);
+          if (v) it.price = variantUnitPrice(v, it);
+        });
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    variants.length,
+    JSON.stringify(
+      (order.items || []).map((i) => [
+        i.productSku,
+        i.size,
+        i.color,
+        i.frontUrl,
+        i.backUrl,
+        i.mockupUrl,
+        i.printArea,
+        (i.extraAreas || []).length,
+      ])
+    ),
+  ]);
+
   const applyDesignSku = (idx: number, sku: string) => {
     set((d) => {
       d.items[idx].sku = sku;
@@ -151,7 +209,7 @@ export default function OrderModal({
 
     const store = stores.find((s) => s.id === selectedStoreId);
     const total = (order.items || []).reduce(
-      (s, i) => s + (i.price || 0) * (i.quantity || 1),
+      (s, i) => s + podItemTotal(i),
       0
     );
     const payload: any = {
@@ -327,15 +385,23 @@ export default function OrderModal({
                   onChange={(v) =>
                     set((d) => {
                       d.items[idx].productSku = v;
-                      const p = products.find((x) => x.sku === v);
-                      if (p && !d.items[idx].productName)
-                        d.items[idx].productName = p.name;
+                      d.items[idx].productName = v;
+                      // Đổi phôi → reset màu/size để chọn lại theo bảng giá mới
+                      d.items[idx].color = "";
+                      d.items[idx].size = "";
                     })
                   }
-                  options={products.map((p) => ({
-                    value: p.sku,
-                    label: p.name,
-                  }))}
+                  options={Array.from(
+                    new Set([
+                      ...productNames,
+                      ...(item.productSku ? [item.productSku] : []),
+                    ])
+                  ).map((n) => ({ value: n, label: n }))}
+                  filterOption={(input, opt) =>
+                    String(opt?.value || "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
                 />
               </div>
               <div className="col-span-3">
@@ -346,18 +412,18 @@ export default function OrderModal({
                   className="w-full"
                   placeholder="-- Không chọn --"
                   allowClear
+                  showSearch
                   value={item.color || undefined}
                   onChange={(v) => set((d) => (d.items[idx].color = v || ""))}
                   options={Array.from(
                     new Set([
-                      ...(products.find((p) => p.sku === item.productSku)
-                        ?.colors || []),
+                      ...colorsOf(item.productSku),
                       ...(item.color ? [item.color] : []),
                     ])
                   ).map((c) => ({ value: c, label: c }))}
                 />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-3">
                 <div className="text-[10px] tracking-widest text-gray-500 mb-1">
                   SIZE (TÙY CHỌN)
                 </div>
@@ -365,12 +431,12 @@ export default function OrderModal({
                   className="w-full"
                   placeholder="-- Không chọn --"
                   allowClear
+                  showSearch
                   value={item.size || undefined}
                   onChange={(v) => set((d) => (d.items[idx].size = v || ""))}
                   options={Array.from(
                     new Set([
-                      ...(products.find((p) => p.sku === item.productSku)
-                        ?.sizes || []),
+                      ...sizesOf(item.productSku),
                       ...(item.size ? [item.size] : []),
                     ])
                   ).map((s) => ({ value: s, label: s }))}
@@ -385,17 +451,6 @@ export default function OrderModal({
                   className="w-full"
                   value={item.quantity}
                   onChange={(v) => set((d) => (d.items[idx].quantity = v || 1))}
-                />
-              </div>
-              <div className="col-span-1">
-                <div className="text-[10px] tracking-widest text-gray-500 mb-1">
-                  GIÁ $
-                </div>
-                <InputNumber
-                  min={0}
-                  className="w-full"
-                  value={item.price}
-                  onChange={(v) => set((d) => (d.items[idx].price = v || 0))}
                 />
               </div>
             </div>
@@ -447,15 +502,57 @@ export default function OrderModal({
                 </span>
                 <button
                   onClick={() =>
-                    set((d) =>
-                      d.items[idx].extraAreas.push({ name: "Vùng in", url: "" })
-                    )
+                    set((d) => {
+                      if (!d.items[idx].extraAreas) d.items[idx].extraAreas = [];
+                      d.items[idx].extraAreas.push({ name: "Vùng in", url: "" });
+                    })
                   }
                   className="text-xs text-[#8B5CF6] bg-[#F3EBFF] rounded-lg px-2 py-1 border-0 cursor-pointer"
                 >
                   + Thêm vùng in
                 </button>
               </div>
+
+              {/* Danh sách vùng in phụ — nhập tên + link ảnh cho từng vùng */}
+              {(item.extraAreas || []).map((area, aIdx) => (
+                <div
+                  key={aIdx}
+                  className="flex items-center gap-2 bg-white border border-[#E9D9FF] rounded-lg p-2"
+                >
+                  <Input
+                    size="small"
+                    className="w-[140px] shrink-0"
+                    placeholder="Tên vùng (Tay áo...)"
+                    value={area.name}
+                    onChange={(e) =>
+                      set((d) => (d.items[idx].extraAreas[aIdx].name = e.target.value))
+                    }
+                  />
+                  <Input
+                    size="small"
+                    className="flex-1"
+                    placeholder="Dán link ảnh vùng in..."
+                    value={area.url}
+                    onChange={(e) =>
+                      set((d) => (d.items[idx].extraAreas[aIdx].url = e.target.value))
+                    }
+                  />
+                  <UploadImgButton
+                    size="small"
+                    onUploaded={(url) =>
+                      set((d) => (d.items[idx].extraAreas[aIdx].url = url))
+                    }
+                  />
+                  <button
+                    onClick={() =>
+                      set((d) => d.items[idx].extraAreas.splice(aIdx, 1))
+                    }
+                    className="text-red-500 text-xs bg-transparent border-0 cursor-pointer shrink-0 px-1"
+                  >
+                    Xóa
+                  </button>
+                </div>
+              ))}
               {item.personalization ? (
                 <div className="text-xs text-gray-500">
                   Personalization:{" "}

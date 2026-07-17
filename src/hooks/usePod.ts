@@ -16,11 +16,13 @@ import {
   where,
 } from "lib/db";
 import { firestore } from "lib/firebase";
+import { sbSelectAll } from "lib/supabase";
 import {
   BaseProduct,
   Design,
   PodOrder,
   PodStore,
+  PodVariant,
 } from "../models/pod";
 import { useUser } from "../store/useUser";
 import { usePodStore } from "../store/usePodStore";
@@ -80,6 +82,27 @@ export function usePodColors() {
     q.data
   );
   return { ...q, colors };
+}
+
+/* -------- Bảng giá phôi POD (biến thể) — đồng bộ từ admin để tính giá đơn -------- */
+
+export function usePodVariants() {
+  // Bảng giá phôi rất lớn (hàng nghìn dòng) — phải phân trang để lấy ĐỦ,
+  // nếu không danh sách phôi sẽ bị thiếu (PostgREST mặc định chỉ trả ~1000 dòng).
+  const q = useQuery(
+    ["pod-variants"],
+    async () => {
+      const rows = await sbSelectAll("podVariants", {
+        order: [{ column: "product", ascending: true }],
+      });
+      return rows.map((r) => {
+        const { created_at, ...rest } = r as any;
+        return rest as PodVariant;
+      });
+    },
+    { staleTime: 5 * 60 * 1000 }
+  );
+  return { ...q, variants: (q.data as PodVariant[]) || [] };
 }
 
 /* ---------------- Base products (phôi) ---------------- */

@@ -1,13 +1,19 @@
-import { AutoComplete, InputNumber, Popover, Select, message } from "antd";
+import { AutoComplete, InputNumber, Popover, Select, Tooltip, message } from "antd";
 import { memo, useEffect, useRef, useState } from "react";
-import { FiDownload } from "react-icons/fi";
+import { FiDownload, FiUploadCloud } from "react-icons/fi";
 import {
-  useBaseProducts,
   useDesignMutations,
   useDesigns,
   usePodColors,
+  usePodVariants,
 } from "../../../hooks/usePod";
-import { PodOrder, PodOrderItem } from "../../../models/pod";
+import {
+  PodOrder,
+  PodOrderItem,
+  findVariant,
+  variantUnitPrice,
+} from "../../../models/pod";
+import { uploadToCloudinary } from "../../../lib/cloudinary";
 import { imageUrlCandidates } from "../../../utils/imageUrl";
 
 
@@ -123,7 +129,7 @@ function Thumb({
   );
 }
 
-/** 1 hàng gọn: thumbnail (hover xem lớn) + nhãn màu + ô dán link */
+/** 1 hàng gọn: thumbnail (hover xem lớn) + nhãn màu + ô dán link + nút upload ảnh */
 function ThumbLink({
   label,
   color,
@@ -137,6 +143,23 @@ function ThumbLink({
   onCommit: (v: string) => void;
   bg?: string;
 }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (file?: File | null) => {
+    if (!file) return;
+    try {
+      setUploading(true);
+      const url = await uploadToCloudinary(file);
+      onCommit(url);
+      message.success(`Đã upload ảnh ${label}`);
+    } catch (err: any) {
+      message.error(`Upload thất bại: ${err?.message || err}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-2 border border-gray-200 rounded-lg p-1.5 bg-white">
       <Thumb url={value} tag={label} small bg={bg} />
@@ -150,11 +173,35 @@ function ThumbLink({
         <input
           key={value}
           defaultValue={value}
-          placeholder="Dán link..."
+          placeholder="Dán link hoặc upload ảnh..."
           className="border-0 outline-none text-[11px] w-full text-gray-600 bg-transparent p-0"
           onBlur={(e) => e.target.value !== value && onCommit(e.target.value)}
         />
       </div>
+      <Tooltip title={`Upload ảnh ${label}`}>
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+          className={`w-7 h-7 shrink-0 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center ${
+            uploading
+              ? "cursor-wait text-gray-300"
+              : "cursor-pointer text-gray-500 hover:text-[#2563EB] hover:border-[#D6E4FF] hover:bg-[#EFF4FF]"
+          }`}
+        >
+          <FiUploadCloud size={13} className={uploading ? "animate-pulse" : ""} />
+        </button>
+      </Tooltip>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          handleFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }
@@ -169,12 +216,50 @@ function OrderItemEditor({
   onPatchItem: (patch: Partial<PodOrderItem>) => void;
 }) {
   const item = order.items[index];
-  const { products } = useBaseProducts();
+  const { variants } = usePodVariants();
   const { designs } = useDesigns();
   const { colors: podColors } = usePodColors();
   const itemBg = colorToCss(item.color, podColors);
   const { add: addDesign, update: updateDesign } = useDesignMutations();
-  const product = products.find((p) => p.sku === item.productSku);
+
+  // Danh mục phôi + màu + size lấy từ Bảng giá phôi POD (admin)
+  const productNames = Array.from(
+    new Set(variants.map((v) => v.product?.trim()).filter(Boolean) as string[])
+  ).sort((a, b) => a.localeCompare(b));
+  const productColors = Array.from(
+    new Set(
+      variants
+        .filter((v) => v.product === item.productSku)
+        .map((v) => (v.color || "").trim())
+        .filter(Boolean)
+    )
+  );
+  const productSizes = Array.from(
+    new Set(
+      variants
+        .filter((v) => v.product === item.productSku)
+        .map((v) => (v.size || "").trim())
+        .filter(Boolean)
+    )
+  );
+  // Tự tính đơn giá theo bảng giá phôi POD khi phôi/size/màu/link/vùng in đổi.
+  // Chỉ ghi đè khi tìm được biến thể khớp (tránh xoá giá đơn import từ Etsy).
+  useEffect(() => {
+    const v = findVariant(variants, item.productSku, item.size, item.color);
+    if (!v) return;
+    const price = variantUnitPrice(v, item);
+    if (price !== (item.price || 0)) onPatchItem({ price });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    variants.length,
+    item.productSku,
+    item.size,
+    item.color,
+    item.frontUrl,
+    item.backUrl,
+    item.mockupUrl,
+    item.printArea,
+  ]);
 
   // Tự đồng bộ từ thư viện — không cần bấm nút:
   // - Khi SKU vừa đổi sang mã CÓ trong thư viện → đồng bộ đầy đủ FRONT/BACK/MOCKUP
@@ -320,26 +405,30 @@ function OrderItemEditor({
           className="w-full"
           placeholder="Chọn phôi..."
           value={item.productSku || undefined}
-          onChange={(v) => {
-            const p = products.find((x) => x.sku === v);
+          onChange={(v) =>
             onPatchItem({
               productSku: v,
-              productName: item.productName || p?.name || "",
-            });
-          }}
-          options={products.map((p) => ({
-            value: p.sku,
-            label: p.name,
-          }))}
+              productName: v,
+              // Đổi phôi → reset màu/size để chọn lại theo bảng giá phôi mới
+              color: "",
+              size: "",
+            })
+          }
+          options={Array.from(
+            new Set([
+              ...productNames,
+              ...(item.productSku ? [item.productSku] : []),
+            ])
+          ).map((n) => ({ value: n, label: n }))}
           filterOption={(input, opt) =>
-            `${opt?.label || ""} ${opt?.value || ""}`
+            String(opt?.value || "")
               .toLowerCase()
               .includes(input.toLowerCase())
           }
         />
         <div className="flex gap-2">
-          {/* Màu/Size theo phôi trong Kho Phôi POD; giá trị hiện tại (từ Etsy)
-              vẫn giữ trong danh sách để xem/đổi qua lại được */}
+          {/* Màu/Size lấy từ Bảng giá phôi POD (admin); giá trị hiện tại
+              (từ Etsy) vẫn giữ trong danh sách để xem/đổi qua lại được */}
           <Select
             className="flex-1 min-w-0"
             placeholder="Chọn Màu"
@@ -349,7 +438,7 @@ function OrderItemEditor({
             onChange={(v) => onPatchItem({ color: v || "" })}
             options={Array.from(
               new Set([
-                ...(product?.colors || []),
+                ...productColors,
                 ...(item.color ? [item.color] : []),
               ])
             ).map((c) => ({ value: c, label: c }))}
@@ -363,7 +452,7 @@ function OrderItemEditor({
             onChange={(v) => onPatchItem({ size: v || "" })}
             options={Array.from(
               new Set([
-                ...(product?.sizes || []),
+                ...productSizes,
                 ...(item.size ? [item.size] : []),
               ])
             ).map((s) => ({ value: s, label: s }))}
