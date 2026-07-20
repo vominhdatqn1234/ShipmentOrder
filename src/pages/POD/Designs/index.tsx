@@ -47,9 +47,17 @@ function SafeImg({ url, alt }: { url: string; alt: string }) {
   );
 }
 
-const SWATCHES = ["#FFFFFF", "#111111", "#2B4A8B", "#7B2430"];
+const SWATCHES = [
+  { name: "Graphite", color: "#353231" },
+  { name: "Pepper", color: "#6B6B68" },
+  { name: "Grey", color: "#A9A9A9" },
+  { name: "Black", color: "#000000" },
+  { name: "Red", color: "#BE0F26" },
+  { name: "White", color: "#FFFFFF" },
+];
 
 /** Dãy swatch màu nền ướm thử + nút chọn màu tùy ý (color picker) */
+
 function TestBgPicker({
   value,
   onChange,
@@ -58,43 +66,55 @@ function TestBgPicker({
   onChange: (color: string) => void;
 }) {
   const timer = useRef<any>(null);
-  const isCustom = !!value && !SWATCHES.includes(value);
+
+  const isCustom =
+    !!value && !SWATCHES.some((item) => item.color === value);
+
   const debounced = (color: string) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => onChange(color), 350);
   };
+
   return (
     <div className="flex gap-1.5 items-center">
-      {SWATCHES.map((c) => (
-        <button
-          key={c}
-          onClick={() => onChange(c)}
-          title={c}
-          className={`w-5 h-5 rounded-full cursor-pointer border-2 ${
-            value === c ? "border-[#C6A15B]" : "border-gray-200"
-          }`}
-          style={{ background: c }}
-        />
+      {SWATCHES.map(({ name, color }) => (
+        <Tooltip key={color} title={name} placement="top">
+          <button
+            onClick={() => onChange(color)}
+            className={`w-5 h-5 rounded-full cursor-pointer border-2 transition-all hover:scale-110 ${
+              value === color
+                ? "border-[#C6A15B]"
+                : "border-gray-200"
+            }`}
+            style={{ backgroundColor: color }}
+          />
+        </Tooltip>
       ))}
+
       {/* Màu tùy chọn */}
-      <label
-        title="Chọn màu tùy ý"
-        className={`w-5 h-5 rounded-full cursor-pointer border-2 relative overflow-hidden inline-block ${
-          isCustom ? "border-[#C6A15B]" : "border-gray-200"
-        }`}
-        style={{
-          background: isCustom
-            ? value
-            : "conic-gradient(red,yellow,lime,cyan,blue,magenta,red)",
-        }}
-      >
-        <input
-          type="color"
-          className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-          value={/^#[0-9a-fA-F]{6}$/.test(value || "") ? value : "#F9FAFB"}
-          onChange={(e) => debounced(e.target.value)}
-        />
-      </label>
+      <Tooltip title="Custom Color" placement="top">
+        <label
+          className={`w-5 h-5 rounded-full cursor-pointer border-2 relative overflow-hidden inline-block ${
+            isCustom ? "border-[#C6A15B]" : "border-gray-200"
+          }`}
+          style={{
+            background: isCustom
+              ? value
+              : "conic-gradient(red,yellow,lime,cyan,blue,magenta,red)",
+          }}
+        >
+          <input
+            type="color"
+            className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+            value={
+              /^#[0-9a-fA-F]{6}$/.test(value || "")
+                ? value
+                : "#F9FAFB"
+            }
+            onChange={(e) => debounced(e.target.value)}
+          />
+        </label>
+      </Tooltip>
     </div>
   );
 }
