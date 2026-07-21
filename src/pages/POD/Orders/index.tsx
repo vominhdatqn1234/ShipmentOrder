@@ -43,6 +43,7 @@ import {
 } from "../../../models/pod";
 import { usePodStore } from "../../../store/usePodStore";
 import { downloadCSV, parseCSV, parseVariations, toCSV } from "../../../utils/csvPod";
+import { parseEtsyPackingSlipPdf } from "../../../utils/pdfPod";
 import OrderItemEditor from "./OrderItemEditor";
 import OrderModal from "./OrderModal";
 import { useAccountGuard } from "../../../hooks/useAccountGuard";
@@ -115,6 +116,29 @@ export default function Orders() {
     total: number;
   } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleImportPdf = async (file: File) => {
+    if (!canCreate) return message.warning(createBlockMsg);
+    const store = stores.find((s) => s.id === selectedStoreId);
+    try {
+      const preview = await parseEtsyPackingSlipPdf(file, {
+        storeId: selectedStoreId,
+        store,
+        designs,
+        variants,
+      });
+      if (!preview.length) {
+        message.error("Không tìm thấy đơn Etsy hợp lệ trong file PDF này");
+        return;
+      }
+      setImportPreview(preview);
+      setPreviewPage(1);
+      message.info(`Đọc được ${preview.length} đơn từ ${file.name} — kiểm tra rồi bấm Đồng bộ lên Web`);
+    } catch (error) {
+      console.error("PDF import error", error);
+      message.error("Không thể đọc file PDF. Vui lòng dùng packing slip PDF xuất từ Etsy.");
+    }
+  };
 
   // Sửa 1 item trong đơn ngay trên bảng (inline editor)
   const patchOrderItem = (
@@ -569,7 +593,7 @@ export default function Orders() {
               : "cursor-pointer bg-transparent text-gray-500"
           }`}
         >
-          <FiFileText /> Import CSV
+          <FiFileText /> Import đơn
         </button>
         <button
           onClick={() => {
@@ -1044,7 +1068,7 @@ export default function Orders() {
               onClick={() => fileRef.current?.click()}
               className="h-[46px] px-5 rounded-xl border-2 border-dashed border-gray-300 bg-white text-[#171826] font-bold text-sm cursor-pointer hover:border-[#C6A15B] hover:text-[#C6A15B] transition-colors"
             >
-              Chọn file CSV
+              Chọn file CSV hoặc PDF
             </button>
             <Button
               type="primary"
@@ -1062,17 +1086,23 @@ export default function Orders() {
             <input
               ref={fileRef}
               type="file"
-              accept=".csv"
+              accept=".csv,.pdf,application/pdf,text/csv"
               hidden
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleImportFile(f);
+                if (f) {
+                  if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+                    handleImportPdf(f);
+                  } else {
+                    handleImportFile(f);
+                  }
+                }
                 e.target.value = "";
               }}
             />
             <span className="text-gray-400 text-sm">
-              Hỗ trợ file export đơn hàng từ Etsy (Sale Date, Order ID, Ship
-              Name, Variations, SKU...)
+              Hỗ trợ CSV export Etsy hoặc packing slip PDF Etsy (Order #, Ship to,
+              SKU, Quantity, Styles - Colors, Size, Personalization).
             </span>
           </div>
 
@@ -1102,8 +1132,8 @@ export default function Orders() {
           ) : (
             importPreview.length > 0 && (
               <div className="bg-[#EFF4FF] border border-[#D6E4FF] text-[#2563EB] rounded-2xl px-5 py-4 font-bold">
-                Đã chuẩn bị {importPreview.length} đơn hàng từ file CSV (đã gộp
-                các đơn trùng ID). Kiểm tra bên dưới rồi bấm "Đồng bộ lên Web".
+                Đã chuẩn bị {importPreview.length} đơn hàng. Kiểm tra bên dưới rồi
+                bấm "Đồng bộ lên Web".
               </div>
             )
           )}
@@ -1197,7 +1227,7 @@ export default function Orders() {
               {!importPreview.length && (
                 <tr>
                   <td colSpan={6} className="p-16 text-center text-gray-400">
-                    Chọn file CSV để xem trước dữ liệu import
+                    Chọn file CSV hoặc PDF để xem trước dữ liệu import
                   </td>
                 </tr>
               )}

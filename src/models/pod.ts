@@ -212,6 +212,8 @@ export interface PodOrder {
   note?: string;
   total: number;
   created: string;
+  /** Hạn giao Etsy (Scheduled to ship by), dùng để ưu tiên fulfil đơn gấp */
+  shipBy?: string | null;
   datePaid?: string | null;
   dateShipped?: string | null;
   /** Trạng thái trước khi gửi Yêu cầu Hỗ trợ (để admin hủy yêu cầu trả về đúng chỗ) */

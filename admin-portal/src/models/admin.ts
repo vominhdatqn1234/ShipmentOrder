@@ -59,6 +59,8 @@ export interface PodOrder {
   note?: string;
   total: number;
   created: string;
+  /** Hạn giao Etsy (Scheduled to ship by) */
+  shipBy?: string | null;
   datePaid?: string | null;
   dateShipped?: string | null;
   /** Trạng thái trước khi gửi Yêu cầu Hỗ trợ */
