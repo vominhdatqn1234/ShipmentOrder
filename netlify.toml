@@ -1,6 +1,7 @@
 # Netlify config — CLIENT site (base directory = repo root)
 [build]
-  command = "yarn build"
+  # PDF.js worker được publish thành asset tĩnh để browser tải được sau SPA redirect.
+  command = "yarn build && cp node_modules/pdfjs-dist/legacy/build/pdf.worker.min.js build/pdf.worker.min.js"
   publish = "build"
 
 [build.environment]

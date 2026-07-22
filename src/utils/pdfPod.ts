@@ -15,11 +15,10 @@ export type PdfOrderPreview = {
 
 const clean = (value = "") => value.replace(/\s+/g, " ").trim();
 
-// Đóng gói worker cùng app để quá trình đọc PDF không phụ thuộc CDN/Internet.
-GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/legacy/build/pdf.worker.min.js",
-  import.meta.url
-).toString();
+// Netlify cần một URL tĩnh cho PDF worker. `new URL(..., import.meta.url)`
+// có thể sinh asset URL không tồn tại sau SPA redirect, khiến getDocument báo
+// "Không thể đọc file PDF" dù file Etsy hoàn toàn hợp lệ.
+GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ""}/pdf.worker.min.js`;
 
 function parseAddress(lines: string[]) {
   const values = lines.map(clean).filter(Boolean);
