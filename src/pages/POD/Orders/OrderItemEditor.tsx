@@ -332,12 +332,9 @@ function OrderItemEditor({
     }
   };
 
-  const variation = [
-    item.size,
-    item.personalization ? `Personalization:${item.personalization}` : "",
-  ]
-    .filter(Boolean)
-    .join(", ");
+  // Thanh vàng là tiêu đề của món hàng. Size/màu đã có ô riêng bên dưới,
+  // nên ưu tiên giữ nguyên tên listing Etsy khi import.
+  const itemTitle = item.productName || item.productSku || item.size;
 
   return (
     <div className="flex gap-4 items-start bg-white border border-gray-200 rounded-xl p-3 min-w-[560px]">
@@ -392,11 +389,11 @@ function OrderItemEditor({
 
       {/* Cột phải: phôi + biến thể */}
       <div className="flex-1 min-w-0 space-y-2">
-        {variation && (
+        {itemTitle && (
           <div className="flex items-center gap-2 bg-[#FFF9E6] border border-[#F3E2A9] text-[#B7791F] rounded-lg px-3 py-1.5 text-xs font-bold">
             <span className="shrink-0">ⓘ</span>
-            <span className="truncate" title={variation}>
-              {variation}
+            <span className="truncate" title={itemTitle}>
+              {itemTitle}
             </span>
           </div>
         )}

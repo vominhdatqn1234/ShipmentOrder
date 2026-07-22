@@ -86,16 +86,23 @@ function parseItems(
     const quantity = Number(
       details.find((line) => /^Quantity:\s*/i.test(line))?.replace(/^Quantity:\s*/i, "") || 1
     );
-    const style = clean(
-      details
-        .find((line) => /^Styles\s*-\s*Colors:\s*/i.test(line))
-        ?.replace(/^Styles\s*-\s*Colors:\s*/i, "") || ""
+    const styleLine = details.find((line) =>
+      /^Styles?(?:\s*-?\s*Colors?|\s+and\s+Size):\s*/i.test(line)
     );
-    // Etsy packing slip: "Styles - Colors: Gildan - DarkHeather".
-    // "Gildan" là loại phôi (productSku trong hệ thống), còn Luca3-GDVS-21
-    // là mã thiết kế Etsy nên phải lưu ở trường sku.
-    const [productStyle = "", ...colorParts] = style.split(" - ");
-    const color = colorParts.join(" - ");
+    const style = clean(
+      styleLine?.replace(
+        /^Styles?(?:\s*-?\s*Colors?|\s+and\s+Size):\s*/i,
+        ""
+      ) || ""
+    );
+    // Etsy thay đổi nhãn variation tùy listing: "Styles - Colors",
+    // "Styles Colors" hoặc "Styles and Size". Giá trị thường là
+    // "Gildan - Black" (có dấu phân cách) hoặc "Gildan Black" (không có).
+    // SKU thiết kế Etsy vẫn được giữ riêng ở trường `sku`.
+    const separatedStyle = style.split(/\s+-\s+/);
+    const [productStyle = "", ...colorParts] =
+      separatedStyle.length > 1 ? separatedStyle : style.split(/\s+/);
+    const color = colorParts.join(separatedStyle.length > 1 ? " - " : " ");
     const size = clean(
       details.find((line) => /^Size:\s*/i.test(line))?.replace(/^Size:\s*/i, "") || ""
     );
@@ -140,50 +147,55 @@ export async function parseEtsyPackingSlipPdf(
   const previews: PdfOrderPreview[] = [];
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const content = await page.getTextContent();
-    const lines = content.items
-      .map((item: any) => clean(item.str || ""))
-      .filter(Boolean);
-    const code = lines.find((line) => /^Order\s*#/i.test(line))?.replace(/^Order\s*#/i, "");
-    const shipTo = lines.findIndex((line) => /^Ship to$/i.test(line));
-    const shipEnd = lines.findIndex((line, index) => index > shipTo && /^Scheduled to ship by$/i.test(line));
-    if (!code || shipTo < 0 || shipEnd < 0) continue;
+    try {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const lines = content.items
+        .map((item: any) => clean(item.str || ""))
+        .filter(Boolean);
+      const code = lines.find((line) => /^Order\s*#/i.test(line))?.replace(/^Order\s*#/i, "");
+      const shipTo = lines.findIndex((line) => /^Ship to$/i.test(line));
+      const shipEnd = lines.findIndex((line, index) => index > shipTo && /^Scheduled to ship by$/i.test(line));
+      if (!code || shipTo < 0 || shipEnd < 0) continue;
 
-    const orderDateIndex = lines.findIndex((line) => /^Order date$/i.test(line));
-    const orderDate = orderDateIndex >= 0 ? lines[orderDateIndex + 1] : "";
-    const shipByIndex = lines.findIndex((line) => /^Scheduled to ship by$/i.test(line));
-    const shipByDate = shipByIndex >= 0 ? new Date(lines[shipByIndex + 1]) : null;
-    const items = parseItems(lines, options.designs, options.variants);
-    if (!items.length) continue;
-    const address = parseAddress(lines.slice(shipTo + 1, shipEnd));
-    const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const createdDate = new Date(orderDate);
+      const orderDateIndex = lines.findIndex((line) => /^Order date$/i.test(line));
+      const orderDate = orderDateIndex >= 0 ? lines[orderDateIndex + 1] : "";
+      const shipByIndex = lines.findIndex((line) => /^Scheduled to ship by$/i.test(line));
+      const shipByDate = shipByIndex >= 0 ? new Date(lines[shipByIndex + 1]) : null;
+      const items = parseItems(lines, options.designs, options.variants);
+      if (!items.length) continue;
+      const address = parseAddress(lines.slice(shipTo + 1, shipEnd));
+      const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const createdDate = new Date(orderDate);
 
-    previews.push({
-      id: `etsy-pdf-${code}-${pageNumber}`,
-      data: {
-        orderCode: code,
-        storeId: options.storeId,
-        storeName: options.store?.name || "",
-        status: "pending_payment",
-        tracking: "",
-        source: "etsy",
-        customerEmail: "",
-        customerPhone: "",
-        ...address,
-        items,
-        note: `Imported from ${file.name}`,
-        total,
-        shipBy:
-          shipByDate && !Number.isNaN(shipByDate.getTime())
-            ? shipByDate.toISOString()
-            : null,
-        created: Number.isNaN(createdDate.getTime())
-          ? new Date().toISOString()
-          : createdDate.toISOString(),
-      },
-    });
+      previews.push({
+        id: `etsy-pdf-${code}-${pageNumber}`,
+        data: {
+          orderCode: code,
+          storeId: options.storeId,
+          storeName: options.store?.name || "",
+          status: "pending_payment",
+          tracking: "",
+          source: "etsy",
+          customerEmail: "",
+          customerPhone: "",
+          ...address,
+          items,
+          note: `Imported from ${file.name}`,
+          total,
+          shipBy:
+            shipByDate && !Number.isNaN(shipByDate.getTime())
+              ? shipByDate.toISOString()
+              : null,
+          created: Number.isNaN(createdDate.getTime())
+            ? new Date().toISOString()
+            : createdDate.toISOString(),
+        },
+      });
+    } catch (error) {
+      // Một trang hỏng không nên làm mất các đơn hợp lệ ở trang còn lại.
+      console.warn(`Không thể đọc trang ${pageNumber} của ${file.name}`, error);
+    }
   }
 
   return previews;
