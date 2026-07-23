@@ -46,7 +46,13 @@ import {
 import { DEFAULT_COLOR_HEX } from "../../lib/colorHex";
 import { sbUpsert } from "../../lib/supabase";
 import { useQueryClient } from "react-query";
-import { ORDER_STATUS, OrderItem, PodOrder, Seller } from "../../models/admin";
+import {
+  ORDER_STATUS,
+  OrderItem,
+  PodOrder,
+  Seller,
+  splitSizeFromColor,
+} from "../../models/admin";
 import { downloadCSV, parseCSV, toCSV } from "../../lib/csvPod";
 import { toDirectImageUrl } from "../../lib/imageUrl";
 
@@ -1228,17 +1234,21 @@ export default function Sellers() {
                       <td className="p-3">
                         <div className="space-y-1.5">
                           {(o.items || []).map((it, i) => {
-                            // Bản GỐC khách up: ưu tiên field orig; fallback field cũ
-                            const oType = it.origType ?? it.productName ?? "";
-                            const oColor = it.origColor ?? it.color ?? "";
-                            const oSize = it.origSize ?? it.size ?? "";
+                            // Bản GỐC khách up: ưu tiên field orig; fallback về
+                            // productSku (KHÔNG dùng productName vì đó là tên
+                            // listing dài, không phải Type)
+                            const oType = it.origType ?? it.productSku ?? "";
+                            // Tách size bị dính trong color (vd "Gildan 2XL")
+                            const { color: oColor, size: oSize } =
+                              splitSizeFromColor(
+                                it.origColor ?? it.color,
+                                it.origSize ?? it.size
+                              );
                             const orig =
                               [
                                 oType && `Type: ${oType}`,
                                 oColor && `Color: ${oColor}`,
                                 oSize && `Size: ${oSize}`,
-                                it.personalization &&
-                                  `Personalization: ${it.personalization}`,
                               ]
                                 .filter(Boolean)
                                 .join(" · ") || "—";

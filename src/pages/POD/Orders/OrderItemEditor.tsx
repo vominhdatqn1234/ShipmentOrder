@@ -11,6 +11,7 @@ import {
   PodOrder,
   PodOrderItem,
   findVariant,
+  splitSizeFromColor,
   variantUnitPrice,
 } from "../../../models/pod";
 import { uploadToCloudinary } from "../../../lib/cloudinary";
@@ -290,17 +291,33 @@ function OrderItemEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.sku, item.frontUrl, item.backUrl, item.mockupUrl, designs.length]);
 
-  // Backfill 1 lần cho đơn cũ / import CSV chưa có bản gốc:
-  // chụp lại giá trị hiện tại làm bản GỐC trước khi seller sửa phôi.
+  // Backfill 1 lần cho đơn cũ / import CSV chưa có bản gốc + chữa size dính color.
   useEffect(() => {
+    const patch: Partial<PodOrderItem> = {};
+
+    // 1) Chụp bản GỐC nếu chưa có
     if (item.origTitle === undefined) {
-      onPatchItem({
-        origTitle: item.productName || item.productSku || "",
-        origType: item.productSku || "",
-        origColor: item.color || "",
-        origSize: item.size || "",
-      });
+      patch.origTitle = item.productName || item.productSku || "";
+      patch.origType = item.productSku || "";
+      patch.origColor = item.color || "";
+      patch.origSize = item.size || "";
     }
+
+    // 2) Tách size bị dính trong color (vd "Gildan 2XL") — cả phôi lẫn bản gốc
+    const f = splitSizeFromColor(item.color, item.size);
+    if (f.color !== (item.color || "") || f.size !== (item.size || "")) {
+      patch.color = f.color;
+      patch.size = f.size;
+    }
+    const baseOrigColor = patch.origColor ?? item.origColor;
+    const baseOrigSize = patch.origSize ?? item.origSize;
+    if (baseOrigColor !== undefined || baseOrigSize !== undefined) {
+      const o = splitSizeFromColor(baseOrigColor, baseOrigSize);
+      if (o.color !== (baseOrigColor || "")) patch.origColor = o.color;
+      if (o.size !== (baseOrigSize || "")) patch.origSize = o.size;
+    }
+
+    if (Object.keys(patch).length) onPatchItem(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

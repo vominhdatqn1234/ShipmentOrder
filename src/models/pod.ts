@@ -120,6 +120,35 @@ export interface PodVariant {
 
 const _norm = (x?: string) => (x || "").trim().toLowerCase();
 
+/** Các mã size thường gặp (để tách size bị dính trong color, vd "Gildan 2XL") */
+export const KNOWN_SIZES = [
+  "XS", "S", "M", "L", "XL", "XXL", "XXXL",
+  "2XL", "3XL", "4XL", "5XL", "6XL",
+  "2X", "3X", "4X", "5X",
+];
+
+/**
+ * Etsy đôi khi gộp size vào color (vd color = "Gildan 2XL", size = "").
+ * Nếu size trống mà color kết thúc bằng 1 mã size đã biết → tách ra.
+ * Chỉ tách khi color còn ít nhất 1 từ khác (không biến color thành rỗng).
+ */
+export function splitSizeFromColor(
+  color?: string,
+  size?: string
+): { color: string; size: string } {
+  let c = (color || "").trim();
+  let s = (size || "").trim();
+  if (!s && c) {
+    const toks = c.split(/\s+/);
+    const last = (toks[toks.length - 1] || "").toUpperCase();
+    if (toks.length > 1 && KNOWN_SIZES.includes(last)) {
+      s = toks.pop() as string;
+      c = toks.join(" ");
+    }
+  }
+  return { color: c, size: s };
+}
+
 
 /**
  * Tìm biến thể phôi khớp Sản phẩm + Size + Màu.

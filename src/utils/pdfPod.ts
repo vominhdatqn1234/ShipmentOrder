@@ -5,6 +5,7 @@ import {
   PodStore,
   PodVariant,
   findVariant,
+  splitSizeFromColor,
   variantUnitPrice,
 } from "../models/pod";
 
@@ -101,10 +102,12 @@ function parseItems(
     const separatedStyle = style.split(/\s+-\s+/);
     const [productStyle = "", ...colorParts] =
       separatedStyle.length > 1 ? separatedStyle : style.split(/\s+/);
-    const color = colorParts.join(separatedStyle.length > 1 ? " - " : " ");
-    const size = clean(
+    const rawColor = colorParts.join(separatedStyle.length > 1 ? " - " : " ");
+    const rawSize = clean(
       details.find((line) => /^Size:\s*/i.test(line))?.replace(/^Size:\s*/i, "") || ""
     );
+    // Etsy hay gộp size vào color (vd "Gildan 2XL") → tách size ra khi ô Size trống
+    const { color, size } = splitSizeFromColor(rawColor, rawSize);
     const personalization = clean(
       details
         .find((line) => /^Personalization:\s*/i.test(line))
