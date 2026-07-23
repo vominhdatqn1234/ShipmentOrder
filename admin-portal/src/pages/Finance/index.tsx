@@ -92,16 +92,13 @@ export default function Finance() {
       e.discountAmount !== s.discountAmount
     );
   };
-  const saveFee = async (store: Store) => {
+  // Tự lưu khi rời ô (onBlur), chỉ lưu khi có thay đổi
+  const saveFeeIfDirty = async (store: Store) => {
+    if (!feeDirty(store) || savingFeeId === store.id) return;
     setSavingFeeId(store.id);
     try {
       await updateStore.mutateAsync({ id: store.id, ...feeVal(store) } as any);
       message.success(`Đã lưu phí cho shop ${store.name}`);
-      setFeeEdits((prev) => {
-        const next = { ...prev };
-        delete next[store.id];
-        return next;
-      });
     } finally {
       setSavingFeeId(null);
     }
@@ -526,6 +523,8 @@ export default function Finance() {
                                   onChange={(v) =>
                                     setFee(st.store, "designSupportFee", v)
                                   }
+                                  onBlur={() => saveFeeIfDirty(st.store)}
+                                  onPressEnter={() => saveFeeIfDirty(st.store)}
                                 />
                               </td>
                               <td className="py-2.5 text-center">
@@ -537,6 +536,8 @@ export default function Finance() {
                                   onChange={(v) =>
                                     setFee(st.store, "mgmtFee", v)
                                   }
+                                  onBlur={() => saveFeeIfDirty(st.store)}
+                                  onPressEnter={() => saveFeeIfDirty(st.store)}
                                 />
                               </td>
                               <td className="py-2.5 text-center">
@@ -548,32 +549,21 @@ export default function Finance() {
                                   onChange={(v) =>
                                     setFee(st.store, "discountAmount", v)
                                   }
+                                  onBlur={() => saveFeeIfDirty(st.store)}
+                                  onPressEnter={() => saveFeeIfDirty(st.store)}
                                 />
                               </td>
                               <td className="py-2.5 text-right">
-                                <div className="inline-flex gap-2">
-                                  <Button
-                                    size="small"
-                                    type="primary"
-                                    disabled={!feeDirty(st.store)}
-                                    loading={savingFeeId === st.store.id}
-                                    onClick={() => saveFee(st.store)}
-                                  >
-                                    Lưu
-                                  </Button>
-                                  <Button
-                                    size="small"
-                                    disabled={st.debt <= 0.005}
-                                    onClick={() => {
-                                      setClearing({ seller, stat: st });
-                                      setAmount(
-                                        Math.round(st.debt * 100) / 100
-                                      );
-                                    }}
-                                  >
-                                    Gạch nợ
-                                  </Button>
-                                </div>
+                                <Button
+                                  size="small"
+                                  disabled={st.debt <= 0.005}
+                                  onClick={() => {
+                                    setClearing({ seller, stat: st });
+                                    setAmount(Math.round(st.debt * 100) / 100);
+                                  }}
+                                >
+                                  Gạch nợ
+                                </Button>
                               </td>
                             </tr>
                           ))}

@@ -181,6 +181,15 @@ export interface PodOrderItem {
   color: string;
   size: string;
   personalization?: string;
+  /**
+   * Bản GỐC khách up lên (Etsy) — luôn giữ nguyên, không đổi khi seller chọn lại
+   * phôi Fulfill. Hiển thị ở ô vàng. Các field productSku/color/size bên dưới là
+   * phôi Fulfill (mặc định = bản gốc, seller có thể đổi).
+   */
+  origTitle?: string;
+  origType?: string;
+  origColor?: string;
+  origSize?: string;
   /** Vùng in: "" = Mặc định, "special" = Vùng in đặc biệt 16*21 (+$2/sp) */
   printArea?: string;
   quantity: number;

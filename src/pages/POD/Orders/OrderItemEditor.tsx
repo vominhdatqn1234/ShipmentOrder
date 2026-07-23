@@ -290,6 +290,20 @@ function OrderItemEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.sku, item.frontUrl, item.backUrl, item.mockupUrl, designs.length]);
 
+  // Backfill 1 lần cho đơn cũ / import CSV chưa có bản gốc:
+  // chụp lại giá trị hiện tại làm bản GỐC trước khi seller sửa phôi.
+  useEffect(() => {
+    if (item.origTitle === undefined) {
+      onPatchItem({
+        origTitle: item.productName || item.productSku || "",
+        origType: item.productSku || "",
+        origColor: item.color || "",
+        origSize: item.size || "",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const applyDesign = (sku: string) => {
     const d = designs.find((x) => x.sku.toLowerCase() === sku.toLowerCase());
     if (d) {
@@ -332,9 +346,17 @@ function OrderItemEditor({
     }
   };
 
-  // Thanh vàng là tiêu đề của món hàng. Size/màu đã có ô riêng bên dưới,
-  // nên ưu tiên giữ nguyên tên listing Etsy khi import.
-  const itemTitle = item.productName || item.productSku || item.size;
+  // Ô vàng = BẢN GỐC khách up lên, luôn giữ nguyên dù seller đổi phôi bên dưới.
+  const origType = item.origType ?? item.productSku ?? "";
+  const origColor = item.origColor ?? item.color ?? "";
+  const origSize = item.origSize ?? item.size ?? "";
+  const origVariation = [
+    origType && `Type: ${origType}`,
+    origColor && `Color: ${origColor}`,
+    origSize && `Size: ${origSize}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="flex gap-4 items-start bg-white border border-gray-200 rounded-xl p-3 min-w-[560px]">
@@ -389,11 +411,11 @@ function OrderItemEditor({
 
       {/* Cột phải: phôi + biến thể */}
       <div className="flex-1 min-w-0 space-y-2">
-        {itemTitle && (
+        {origVariation && (
           <div className="flex items-center gap-2 bg-[#FFF9E6] border border-[#F3E2A9] text-[#B7791F] rounded-lg px-3 py-1.5 text-xs font-bold">
             <span className="shrink-0">ⓘ</span>
-            <span className="truncate" title={itemTitle}>
-              {itemTitle}
+            <span className="truncate" title={origVariation}>
+              {origVariation}
             </span>
           </div>
         )}

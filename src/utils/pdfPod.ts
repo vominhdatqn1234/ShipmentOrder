@@ -111,13 +111,20 @@ function parseItems(
         ?.replace(/^Personalization:\s*/i, "") || ""
     );
     const design = designs.find((entry) => entry.sku.toLowerCase() === sku.toLowerCase());
+    const origTitle = clean(title) || productStyle || sku;
+    const origType = productStyle || sku;
     const baseItem: PodOrderItem = {
-      productName: clean(title) || productStyle || sku,
-      productSku: productStyle || sku,
+      productName: origTitle,
+      productSku: origType,
       sku,
       color,
       size,
       personalization,
+      // Chụp bản gốc khách up lên — ô vàng luôn hiển thị cái này, không đổi
+      origTitle,
+      origType,
+      origColor: color,
+      origSize: size,
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       price: 0,
       frontUrl: design?.frontUrl || "",
