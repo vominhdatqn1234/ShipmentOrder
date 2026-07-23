@@ -2,7 +2,6 @@ import React, { Suspense } from "react";
 import { ConfigProvider } from "antd";
 import {
   useRoutes,
-  //useRoutes,
 } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
