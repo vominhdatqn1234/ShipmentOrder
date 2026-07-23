@@ -54,6 +54,9 @@
     "zustand": "^4.4.1"
   },
   "scripts": {
+    "copy-pdf-worker": "node -e \"require('fs').copyFileSync(require.resolve('pdfjs-dist/legacy/build/pdf.worker.min.js'), 'public/pdf.worker.min.js')\"",
+    "prestart": "npm run copy-pdf-worker",
+    "prebuild": "npm run copy-pdf-worker",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

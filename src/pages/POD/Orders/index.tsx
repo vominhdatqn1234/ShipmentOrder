@@ -237,6 +237,12 @@ export default function Orders() {
     );
   });
 
+  // Chỉ thanh toán được đơn CHƯA thanh toán (status chờ thanh toán & chưa có datePaid)
+  const payableSelectedIds = selectedIds.filter((id) => {
+    const o = allOrders.find((x) => x.id === id);
+    return o && o.status === "pending_payment" && !o.datePaid;
+  });
+
   // Copy đơn = tạo 1 đơn MỚI dựa trên toàn bộ data của đơn gốc.
   // Đơn mới LUÔN về 0đ (giá từng sản phẩm = 0, tổng = 0) — khách chỉ trả khi tự bấm Pay.
   // - Copy thường: trạng thái Chờ thanh toán, mã <mã gốc>-C1, -C2...
@@ -419,6 +425,27 @@ export default function Orders() {
       datePaid: new Date().toISOString(),
     } as any);
     message.success(`Đã thanh toán đơn ${o.orderCode} — chuyển sang Chờ duyệt`);
+  };
+
+  // Thanh toán hàng loạt — chỉ áp dụng cho đơn CHƯA thanh toán
+  const handlePaySelected = async () => {
+    if (!payableSelectedIds.length) {
+      message.warning("Chỉ thanh toán được đơn Chờ thanh toán");
+      return;
+    }
+    let count = 0;
+    for (const id of payableSelectedIds) {
+      const o = allOrders.find((x) => x.id === id);
+      if (!o) continue;
+      await update.mutateAsync({
+        id: o.id,
+        status: "pending_approval",
+        datePaid: new Date().toISOString(),
+      } as any);
+      count++;
+    }
+    message.success(`Đã thanh toán ${count} đơn — chuyển sang Chờ duyệt`);
+    setSelectedIds([]);
   };
 
   /* ---------- Import CSV Etsy ---------- */
@@ -678,6 +705,24 @@ export default function Orders() {
                 Đã chọn{" "}
                 <b className="text-[#171826]">{selectedIds.length}</b> đơn hàng
               </span>
+              {/* Chỉ hiện nút thanh toán khi trong số đã chọn có đơn CHƯA thanh toán */}
+              {payableSelectedIds.length > 0 && (
+                <Popconfirm
+                  title={`Thanh toán ${payableSelectedIds.length} đơn đã chọn?`}
+                  description="Chỉ đơn Chờ thanh toán mới được thanh toán. Các đơn sẽ chuyển sang Chờ duyệt."
+                  okText="Thanh toán"
+                  cancelText="Hủy"
+                  onConfirm={handlePaySelected}
+                >
+                  <Button
+                    icon={<FiCreditCard />}
+                    loading={update.isLoading}
+                    className="border-[#BBF7D0] text-[#15803D] font-medium"
+                  >
+                    Thanh toán ({payableSelectedIds.length})
+                  </Button>
+                </Popconfirm>
+              )}
               <Popconfirm
                 title={`Copy ${selectedIds.length} đơn đã chọn?`}
                 description="Mỗi đơn sẽ được tạo 1 đơn MỚI (Chờ thanh toán) với cùng sản phẩm, thiết kế, khách hàng."

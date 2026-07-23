@@ -18,6 +18,7 @@ import {
   useOrders,
   useSellers,
   useStores,
+  useStoreMutations,
 } from "../../hooks/useAdmin";
 import { PAID_STATUSES, Seller, Store } from "../../models/admin";
 
@@ -49,6 +50,7 @@ export default function Finance() {
   const { orders } = useOrders();
   const { entries } = useLedger();
   const { add: addLedger, remove: removeLedger } = useLedgerMutations();
+  const { update: updateStore } = useStoreMutations();
   const [tab, setTab] = useState<"breakdown" | "history">("breakdown");
   const [expanded, setExpanded] = useState<string[]>([]);
   const [finPage, setFinPage] = useState(1);
@@ -59,6 +61,51 @@ export default function Finance() {
   } | null>(null);
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
+
+  // Chỉnh nhanh 3 phí ngay trong bảng (inline), không cần modal
+  type FeeSet = {
+    designSupportFee: number;
+    mgmtFee: number;
+    discountAmount: number;
+  };
+  const [feeEdits, setFeeEdits] = useState<Record<string, FeeSet>>({});
+  const [savingFeeId, setSavingFeeId] = useState<string | null>(null);
+
+  const storeFees = (store: Store): FeeSet => ({
+    designSupportFee: store.designSupportFee || 0,
+    mgmtFee: store.mgmtFee || 0,
+    discountAmount: store.discountAmount || 0,
+  });
+  const feeVal = (store: Store): FeeSet => feeEdits[store.id] ?? storeFees(store);
+  const setFee = (store: Store, key: keyof FeeSet, v: number | null) =>
+    setFeeEdits((prev) => ({
+      ...prev,
+      [store.id]: { ...feeVal(store), [key]: v || 0 },
+    }));
+  const feeDirty = (store: Store) => {
+    const e = feeEdits[store.id];
+    if (!e) return false;
+    const s = storeFees(store);
+    return (
+      e.designSupportFee !== s.designSupportFee ||
+      e.mgmtFee !== s.mgmtFee ||
+      e.discountAmount !== s.discountAmount
+    );
+  };
+  const saveFee = async (store: Store) => {
+    setSavingFeeId(store.id);
+    try {
+      await updateStore.mutateAsync({ id: store.id, ...feeVal(store) } as any);
+      message.success(`Đã lưu phí cho shop ${store.name}`);
+      setFeeEdits((prev) => {
+        const next = { ...prev };
+        delete next[store.id];
+        return next;
+      });
+    } finally {
+      setSavingFeeId(null);
+    }
+  };
 
   // Thống kê theo seller -> store
   const sellerStats = useMemo(() => {
@@ -432,6 +479,15 @@ export default function Finance() {
                             <th className="py-2 font-medium text-right">
                               Nợ hiện tại
                             </th>
+                            <th className="py-2 font-medium text-center">
+                              Design ($)
+                            </th>
+                            <th className="py-2 font-medium text-center">
+                              Chi phí QL ($)
+                            </th>
+                            <th className="py-2 font-medium text-center">
+                              Chiết khấu ($)
+                            </th>
                             <th className="py-2 font-medium text-right">
                               Hành động
                             </th>
@@ -461,26 +517,70 @@ export default function Finance() {
                                   </span>
                                 )}
                               </td>
-                              <td className="py-2.5 text-right">
-                                <Button
+                              <td className="py-2.5 text-center">
+                                <InputNumber
                                   size="small"
-                                  disabled={st.debt <= 0.005}
-                                  onClick={() => {
-                                    setClearing({ seller, stat: st });
-                                    setAmount(
-                                      Math.round(st.debt * 100) / 100
-                                    );
-                                  }}
-                                >
-                                  Gạch nợ
-                                </Button>
+                                  className="w-24"
+                                  min={0}
+                                  value={feeVal(st.store).designSupportFee}
+                                  onChange={(v) =>
+                                    setFee(st.store, "designSupportFee", v)
+                                  }
+                                />
+                              </td>
+                              <td className="py-2.5 text-center">
+                                <InputNumber
+                                  size="small"
+                                  className="w-24"
+                                  min={0}
+                                  value={feeVal(st.store).mgmtFee}
+                                  onChange={(v) =>
+                                    setFee(st.store, "mgmtFee", v)
+                                  }
+                                />
+                              </td>
+                              <td className="py-2.5 text-center">
+                                <InputNumber
+                                  size="small"
+                                  className="w-24"
+                                  min={0}
+                                  value={feeVal(st.store).discountAmount}
+                                  onChange={(v) =>
+                                    setFee(st.store, "discountAmount", v)
+                                  }
+                                />
+                              </td>
+                              <td className="py-2.5 text-right">
+                                <div className="inline-flex gap-2">
+                                  <Button
+                                    size="small"
+                                    type="primary"
+                                    disabled={!feeDirty(st.store)}
+                                    loading={savingFeeId === st.store.id}
+                                    onClick={() => saveFee(st.store)}
+                                  >
+                                    Lưu
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    disabled={st.debt <= 0.005}
+                                    onClick={() => {
+                                      setClearing({ seller, stat: st });
+                                      setAmount(
+                                        Math.round(st.debt * 100) / 100
+                                      );
+                                    }}
+                                  >
+                                    Gạch nợ
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           ))}
                           {!storeStats.length && (
                             <tr>
                               <td
-                                colSpan={5}
+                                colSpan={8}
                                 className="py-4 text-center text-gray-400"
                               >
                                 Seller chưa có cửa hàng nào
@@ -629,6 +729,7 @@ export default function Finance() {
           </div>
         </div>
       </Modal>
+
     </div>
   );
 }

@@ -20,6 +20,10 @@ export interface Store {
   taxCode?: string;
   userId?: string;
   created?: string;
+  /** Phí do admin nhập cho từng shop (hiển thị trên Overview seller theo shop) */
+  designSupportFee?: number; // Hỗ trợ design ($)
+  mgmtFee?: number; // Chi phí quản lý ($)
+  discountAmount?: number; // Mức chiết khấu ($)
 }
 
 export interface OrderItem {

@@ -7,6 +7,9 @@ import Loadable from "../components/Loadable";
 const PodLayout = Loadable(lazy(() => import("../components/PodLayout")));
 const Login = Loadable(lazy(() => import("../pages/Login")));
 const Overview = Loadable(lazy(() => import("../pages/POD/Overview")));
+const OverviewDetail = Loadable(
+  lazy(() => import("../pages/POD/OverviewDetail"))
+);
 const Catalog = Loadable(lazy(() => import("../pages/POD/Catalog")));
 const Designs = Loadable(lazy(() => import("../pages/POD/Designs")));
 const Orders = Loadable(lazy(() => import("../pages/POD/Orders")));
@@ -16,6 +19,7 @@ const Profile = Loadable(lazy(() => import("../pages/POD/Profile")));
 
 const podChildren = [
   { path: "/dashboard", element: <Overview /> },
+  { path: "/dashboard/detail/:metric", element: <OverviewDetail /> },
   { path: "/dashboard/catalog", element: <Catalog /> },
   { path: "/dashboard/designs", element: <Designs /> },
   { path: "/dashboard/orders", element: <Orders /> },

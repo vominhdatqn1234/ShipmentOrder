@@ -47,6 +47,10 @@ export interface PodStore {
   taxCode?: string;
   userId?: string;
   created?: string;
+  /** Phí do admin nhập cho từng shop (hiển thị trên Overview theo shop đang chọn) */
+  designSupportFee?: number; // Hỗ trợ design ($)
+  mgmtFee?: number; // Chi phí quản lý ($)
+  discountAmount?: number; // Mức chiết khấu ($)
 }
 
 export interface BaseProduct {
