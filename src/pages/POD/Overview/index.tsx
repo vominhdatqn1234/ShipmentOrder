@@ -66,20 +66,30 @@ function StatCard({
 }
 
 export default function Overview() {
-  const { orders } = usePodOrders();
   const { stores } = useStores();
   const { selectedStoreId } = usePodStore();
   const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>("month");
+  // Phạm vi: "shop" = shop đang chọn, "all" = tất cả shop (ảnh hưởng mọi số liệu)
+  const [scope, setScope] = useState<"shop" | "all">("shop");
+  const { orders } = usePodOrders({ allStores: scope === "all" });
   const goDetail = (metric: string) =>
-    navigate(`/dashboard/detail/${metric}?period=${period}`);
+    navigate(`/dashboard/detail/${metric}?period=${period}&scope=${scope}`);
 
-  // 3 phí do admin nhập cho shop đang chọn (fallback: shop đầu tiên)
+  // 3 phí do admin nhập — theo shop đang chọn hoặc gộp tất cả shop
   const activeStore =
     stores.find((s) => s.id === selectedStoreId) || stores[0];
-  const designSupportFee = activeStore?.designSupportFee || 0;
-  const managementFee = activeStore?.mgmtFee || 0;
-  const discountAmount = activeStore?.discountAmount || 0;
+  const sumFee = (key: "designSupportFee" | "mgmtFee" | "discountAmount") =>
+    stores.reduce((s, st) => s + (st[key] || 0), 0);
+  const isAll = scope === "all";
+  const designSupportFee = isAll ? sumFee("designSupportFee") : activeStore?.designSupportFee || 0;
+  const managementFee = isAll ? sumFee("mgmtFee") : activeStore?.mgmtFee || 0;
+  const discountAmount = isAll ? sumFee("discountAmount") : activeStore?.discountAmount || 0;
+  const feeSub = isAll
+    ? `Tất cả shop (${stores.length})`
+    : activeStore
+    ? `Shop ${activeStore.name}`
+    : "Chưa chọn shop";
 
   // Đơn thuộc 1 kỳ, tính theo mốc thời gian `ref` (để so kỳ này với kỳ trước)
   const inPeriod = (o: any, ref: dayjs.Dayjs) => {
@@ -248,20 +258,41 @@ export default function Overview() {
             Theo dõi hiệu suất kinh doanh và trạng thái đơn hàng của bạn.
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-1 flex">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => setPeriod(p.key)}
-              className={`px-4 py-2 rounded-lg text-sm cursor-pointer border-0 ${
-                period === p.key
-                  ? "bg-[#171826] text-white font-bold"
-                  : "bg-transparent text-gray-500"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Phạm vi thẻ phí: shop đang chọn / tất cả shop */}
+          <div className="bg-white rounded-xl border border-gray-100 p-1 flex">
+            {[
+              { key: "shop", label: "Shop này" },
+              { key: "all", label: "Tất cả shop" },
+            ].map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setScope(s.key as "shop" | "all")}
+                className={`px-4 py-2 rounded-lg text-sm cursor-pointer border-0 ${
+                  scope === s.key
+                    ? "bg-[#171826] text-white font-bold"
+                    : "bg-transparent text-gray-500"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-1 flex">
+            {PERIODS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setPeriod(p.key)}
+                className={`px-4 py-2 rounded-lg text-sm cursor-pointer border-0 ${
+                  period === p.key
+                    ? "bg-[#171826] text-white font-bold"
+                    : "bg-transparent text-gray-500"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -301,7 +332,7 @@ export default function Overview() {
         <StatCard
           title="Hỗ Trợ Design"
           value={usd(designSupportFee, 2)}
-          sub={activeStore ? `Shop ${activeStore.name}` : "Chưa chọn shop"}
+          sub={feeSub}
           subColor="#6B7280"
           icon={<FiHeart />}
           onClick={() => goDetail("design")}
@@ -309,7 +340,7 @@ export default function Overview() {
         <StatCard
           title="Chi Phí Quản Lý"
           value={usd(managementFee, 2)}
-          sub={activeStore ? `Shop ${activeStore.name}` : "Chưa chọn shop"}
+          sub={feeSub}
           subColor="#6B7280"
           icon={<FiBriefcase />}
           onClick={() => goDetail("mgmt")}
@@ -317,7 +348,7 @@ export default function Overview() {
         <StatCard
           title="Mức Chiết Khấu"
           value={usd(discountAmount, 2)}
-          sub={activeStore ? `Shop ${activeStore.name}` : "Chưa chọn shop"}
+          sub={feeSub}
           subColor="#6B7280"
           icon={<FiStar />}
           onClick={() => goDetail("discount")}

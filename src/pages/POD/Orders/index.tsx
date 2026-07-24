@@ -27,6 +27,8 @@ import {
   FiTruck,
 } from "react-icons/fi";
 import { useLocation } from "react-router-dom";
+import { useReactToPrint } from "react-to-print";
+import OrdersPackingSlips from "./OrdersPackingSlips";
 import {
   useDesigns,
   usePodOrderMutations,
@@ -162,6 +164,16 @@ export default function Orders() {
     if (sku) {
       setPresetSku(sku);
       setCreateOpen(true);
+      window.history.replaceState({}, "");
+    }
+  }, [location.state]);
+
+  // Từ trang chi tiết Tổng quan bấm 1 đơn -> tìm sẵn mã đơn đó
+  useEffect(() => {
+    const code = (location.state as any)?.focusOrderCode;
+    if (code) {
+      setStatusTab("all");
+      setSearch(String(code));
       window.history.replaceState({}, "");
     }
   }, [location.state]);
@@ -406,6 +418,13 @@ export default function Orders() {
       )
     );
   };
+
+  // Xuất PDF: in phiếu packing slip từng đơn theo bộ lọc hiện tại (Save as PDF)
+  const printRef = useRef<HTMLDivElement>(null);
+  const handleExportPDF = useReactToPrint({
+    content: () => printRef.current,
+    documentTitle: `orders-${dayjs().format("YYYYMMDD-HHmm")}`,
+  });
 
   // Seller gửi yêu cầu hỗ trợ -> đơn chuyển trạng thái "support" để admin xử lý.
   // Lưu prevStatus để admin "Hủy yêu cầu hỗ trợ" trả đơn về đúng trạng thái cũ.
@@ -690,12 +709,27 @@ export default function Orders() {
             >
               Xuất file CSV
             </Button>
+            <Button
+              icon={<FiFileText />}
+              onClick={() => {
+                if (!filtered.length)
+                  return message.warning("Không có đơn nào để xuất");
+                handleExportPDF?.();
+              }}
+            >
+              Xuất file PDF
+            </Button>
             <div className="ml-auto text-sm text-gray-500">
               Tổng kết quả:{" "}
               <span className="bg-[#171826] text-white rounded px-2 py-0.5 font-bold">
                 {filtered.length}
               </span>
             </div>
+          </div>
+
+          {/* Vùng in ẩn cho Xuất PDF (react-to-print clone nội dung này) */}
+          <div style={{ display: "none" }}>
+            <OrdersPackingSlips ref={printRef} orders={filtered} />
           </div>
 
           {/* Thanh chọn nhiều */}
