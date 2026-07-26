@@ -1,6 +1,7 @@
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf";
 import {
   Design,
+  KNOWN_SIZES,
   PodOrderItem,
   PodStore,
   PodVariant,
@@ -77,7 +78,9 @@ function parseItems(
     // Lấy trường Etsy cuối cùng làm mốc để không làm mất tiêu đề khi một đơn có nhiều item.
     const lastDetailIndex = details.reduce(
       (last, line, detailIndex) =>
-        /^(Quantity|Styles\s*-\s*Colors|Size|Personalization):/i.test(line)
+        /^(Quantity|Styles?\s*-?\s*Colors?|Colors?|Size|Personalization):/i.test(
+          line
+        )
           ? detailIndex
           : last,
       -1
@@ -99,15 +102,52 @@ function parseItems(
     // "Styles Colors" hoặc "Styles and Size". Giá trị thường là
     // "Gildan - Black" (có dấu phân cách) hoặc "Gildan Black" (không có).
     // SKU thiết kế Etsy vẫn được giữ riêng ở trường `sku`.
-    const separatedStyle = style.split(/\s+-\s+/);
-    const [productStyle = "", ...colorParts] =
-      separatedStyle.length > 1 ? separatedStyle : style.split(/\s+/);
-    const rawColor = colorParts.join(separatedStyle.length > 1 ? " - " : " ");
-    const rawSize = clean(
+    // Etsy có 2 kiểu ghi biến thể:
+    //  A) "Styles Colors: <Type> <Color>" (+ "Size: <Size>")
+    //  B) "Size: <Type...> <Size>" + "Color: <Color>"  (Color đứng dòng riêng)
+    const sizeRaw = clean(
       details.find((line) => /^Size:\s*/i.test(line))?.replace(/^Size:\s*/i, "") || ""
     );
-    // Etsy hay gộp size vào color (vd "Gildan 2XL") → tách size ra khi ô Size trống
-    const { color, size } = splitSizeFromColor(rawColor, rawSize);
+    const colorRaw = clean(
+      details
+        .find((line) => /^Colors?:\s*/i.test(line) && !/^Styles/i.test(line))
+        ?.replace(/^Colors?:\s*/i, "") || ""
+    );
+
+    let productStyle = "";
+    let color = "";
+    let size = "";
+
+    if (styleLine) {
+      // Kiểu A: Type + Color nằm trong dòng "Styles Colors"
+      const separatedStyle = style.split(/\s+-\s+/);
+      const [pStyle = "", ...colorParts] =
+        separatedStyle.length > 1 ? separatedStyle : style.split(/\s+/);
+      productStyle = pStyle;
+      const rawColor = colorParts.join(separatedStyle.length > 1 ? " - " : " ");
+      // Etsy hay gộp size vào color (vd "Gildan 2XL") → tách khi Size trống
+      const sp = splitSizeFromColor(rawColor, sizeRaw);
+      color = sp.color;
+      size = sp.size;
+    } else if (colorRaw) {
+      // Kiểu B: Color đứng riêng; dòng Size chứa Type + Size
+      color = colorRaw;
+      const sp = splitSizeFromColor(sizeRaw, "");
+      productStyle = sp.color; // phần Type (vd "Comfort Color")
+      size = sp.size; // token size cuối (vd "S")
+    } else {
+      // Chỉ có dòng Size: nếu là mã size thuần thì giữ nguyên, không thì tách
+      if (KNOWN_SIZES.includes(sizeRaw.toUpperCase())) {
+        size = sizeRaw;
+      } else {
+        const sp = splitSizeFromColor(sizeRaw, "");
+        productStyle = sp.color;
+        size = sp.size;
+      }
+    }
+    // Bỏ chữ "Color"/"Colors" ở cuối Type (vd "Comfort Color" → "Comfort")
+    const strippedStyle = productStyle.replace(/\s+colou?rs?\s*$/i, "").trim();
+    if (strippedStyle) productStyle = strippedStyle;
     const personalization = clean(
       details
         .find((line) => /^Personalization:\s*/i.test(line))
