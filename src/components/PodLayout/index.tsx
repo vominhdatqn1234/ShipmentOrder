@@ -14,6 +14,7 @@ import {
   FiX,
 } from "react-icons/fi";
 import { NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
+import { useAccountGuard } from "../../hooks/useAccountGuard";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useStores, useTotalSpend } from "../../hooks/usePod";
 import { usePodStore } from "../../store/usePodStore";
@@ -54,6 +55,21 @@ export default function PodLayout() {
   const totalSpend = useTotalSpend();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { ensureAccount } = useAccountGuard();
+
+  // Đá seller ra ngoài nếu tài khoản bị admin xóa/vô hiệu hóa trong lúc đang
+  // đăng nhập: kiểm tra ngay khi vào dashboard, định kỳ, và mỗi khi quay lại tab.
+  useEffect(() => {
+    ensureAccount();
+    const iv = setInterval(() => ensureAccount(), 60_000);
+    const onFocus = () => ensureAccount();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(iv);
+      window.removeEventListener("focus", onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isFetched) return; // chờ load xong danh sách store của user

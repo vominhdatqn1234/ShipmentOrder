@@ -56,6 +56,118 @@ function parseAddress(lines: string[]) {
   };
 }
 
+// Một dòng thuộc phần chi tiết biến thể (không phải tiêu đề sản phẩm).
+const isDetailLine = (line: string) =>
+  /^(Quantity|Styles?|Colou?rs?|Size|Personalization)\b[^:]*:/i.test(line);
+
+type ItemSegment = { sku: string; title: string; details: string[] };
+
+/** Dựng 1 PodOrderItem từ tiêu đề + các dòng chi tiết của một item. */
+function buildItem(
+  seg: ItemSegment,
+  designs: Design[],
+  variants: PodVariant[]
+): PodOrderItem {
+  const { sku, title, details } = seg;
+  const quantity = Number(
+    details.find((line) => /^Quantity:\s*/i.test(line))?.replace(/^Quantity:\s*/i, "") || 1
+  );
+
+  // Dòng "Styles..." có thể là: "Styles Colors: ...", "Styles and Size: ...",
+  // hoặc layout 2026 "Styles and size ( Comfort Colors ): t-Shirt M".
+  const styleLine = details.find((line) => /^Styles?\b[^:]*:/i.test(line));
+  const colonPos = styleLine ? styleLine.indexOf(":") : -1;
+  const styleLabel = styleLine ? styleLine.slice(0, colonPos) : "";
+  const styleValue = styleLine ? clean(styleLine.slice(colonPos + 1)) : "";
+  // Hãng phôi đôi khi nằm trong ngoặc ở nhãn: "( Comfort Colors )".
+  const styleMaterial = clean(styleLabel.match(/\(([^)]+)\)/)?.[1] || "");
+
+  const sizeRaw = clean(
+    details.find((line) => /^Size:\s*/i.test(line))?.replace(/^Size:\s*/i, "") || ""
+  );
+  // Dòng "Colors:" đứng riêng (không phải "Styles Colors").
+  const colorLineVal = clean(
+    details
+      .find((line) => /^Colou?rs?:\s*/i.test(line) && !/^Styles/i.test(line))
+      ?.replace(/^Colou?rs?:\s*/i, "") || ""
+  );
+
+  let productStyle = "";
+  let color = "";
+  let size = "";
+
+  if (styleLine) {
+    const separated = styleValue.split(/\s+-\s+/);
+    if (separated.length > 1 && !colorLineVal) {
+      // Kiểu cũ A: "Type - Color" cùng dòng, không có dòng Colors riêng.
+      productStyle = clean(separated[0]);
+      const sp = splitSizeFromColor(clean(separated.slice(1).join(" - ")), sizeRaw);
+      color = sp.color;
+      size = sp.size;
+    } else {
+      // Layout 2026: value = "<Type...> <Size>", màu ở dòng "Colors:" riêng.
+      const sp = splitSizeFromColor(styleValue, sizeRaw);
+      size = sp.size;
+      productStyle = styleMaterial || sp.color; // ưu tiên hãng phôi trong ngoặc
+      color = colorLineVal;
+    }
+  } else if (colorLineVal) {
+    // Kiểu cũ B: không có dòng Styles; Color riêng; Size chứa Type + Size.
+    color = colorLineVal;
+    const sp = splitSizeFromColor(sizeRaw, "");
+    productStyle = sp.color;
+    size = sp.size;
+  } else if (KNOWN_SIZES.includes(sizeRaw.toUpperCase())) {
+    size = sizeRaw;
+  } else {
+    const sp = splitSizeFromColor(sizeRaw, "");
+    productStyle = sp.color;
+    size = sp.size;
+  }
+
+  // Bỏ chữ "Color"/"Colors" ở cuối Type (vd "Comfort Colors" → "Comfort").
+  const strippedStyle = productStyle.replace(/\s+colou?rs?\s*$/i, "").trim();
+  if (strippedStyle) productStyle = strippedStyle;
+
+  const personalization = clean(
+    details
+      .find((line) => /^Personalization:\s*/i.test(line))
+      ?.replace(/^Personalization:\s*/i, "") || ""
+  );
+  const design = sku
+    ? designs.find((entry) => entry.sku.toLowerCase() === sku.toLowerCase())
+    : undefined;
+  const origTitle = clean(title) || productStyle || sku;
+  const origType = productStyle || sku;
+  const baseItem: PodOrderItem = {
+    productName: origTitle,
+    productSku: origType,
+    sku,
+    color,
+    size,
+    personalization,
+    // Chụp bản gốc khách up lên — ô vàng luôn hiển thị cái này, không đổi
+    origTitle,
+    origType,
+    origColor: color,
+    origSize: size,
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    price: 0,
+    frontUrl: design?.frontUrl || "",
+    backUrl: design?.backUrl || "",
+    mockupUrl: design?.mockupUrl || "",
+    extraAreas: design?.extraAreas || [],
+    note: "",
+  };
+  return {
+    ...baseItem,
+    price: variantUnitPrice(
+      findVariant(variants, baseItem.productSku, size, color),
+      baseItem
+    ),
+  };
+}
+
 function parseItems(
   lines: string[],
   designs: Design[],
@@ -63,127 +175,55 @@ function parseItems(
 ): PodOrderItem[] {
   const countIndex = lines.findIndex((line) => /^\d+ items?$/.test(line));
   if (countIndex < 0) return [];
+
   const skuIndexes = lines
     .map((line, index) => ({ line, index }))
     .filter(({ line }) => /^SKU:\s*/i.test(line))
     .map(({ index }) => index);
-  let titleStart = countIndex + 1;
 
-  return skuIndexes.map((skuIndex, index) => {
-    const sku = clean(lines[skuIndex].replace(/^SKU:\s*/i, ""));
-    const detailEnd = skuIndexes[index + 1] || lines.length;
-    const details = lines.slice(skuIndex + 1, detailEnd);
-    const title = lines.slice(titleStart, skuIndex).join(" ");
-    // Phần giữa SKU hiện tại và SKU tiếp theo còn chứa tiêu đề sản phẩm tiếp theo.
-    // Lấy trường Etsy cuối cùng làm mốc để không làm mất tiêu đề khi một đơn có nhiều item.
-    const lastDetailIndex = details.reduce(
-      (last, line, detailIndex) =>
-        /^(Quantity|Styles?\s*-?\s*Colors?|Colors?|Size|Personalization):/i.test(
-          line
-        )
-          ? detailIndex
-          : last,
-      -1
-    );
-    titleStart = skuIndex + 1 + lastDetailIndex + 1;
-    const quantity = Number(
-      details.find((line) => /^Quantity:\s*/i.test(line))?.replace(/^Quantity:\s*/i, "") || 1
-    );
-    const styleLine = details.find((line) =>
-      /^Styles?(?:\s*-?\s*Colors?|\s+and\s+Size):\s*/i.test(line)
-    );
-    const style = clean(
-      styleLine?.replace(
-        /^Styles?(?:\s*-?\s*Colors?|\s+and\s+Size):\s*/i,
-        ""
-      ) || ""
-    );
-    // Etsy thay đổi nhãn variation tùy listing: "Styles - Colors",
-    // "Styles Colors" hoặc "Styles and Size". Giá trị thường là
-    // "Gildan - Black" (có dấu phân cách) hoặc "Gildan Black" (không có).
-    // SKU thiết kế Etsy vẫn được giữ riêng ở trường `sku`.
-    // Etsy có 2 kiểu ghi biến thể:
-    //  A) "Styles Colors: <Type> <Color>" (+ "Size: <Size>")
-    //  B) "Size: <Type...> <Size>" + "Color: <Color>"  (Color đứng dòng riêng)
-    const sizeRaw = clean(
-      details.find((line) => /^Size:\s*/i.test(line))?.replace(/^Size:\s*/i, "") || ""
-    );
-    const colorRaw = clean(
-      details
-        .find((line) => /^Colors?:\s*/i.test(line) && !/^Styles/i.test(line))
-        ?.replace(/^Colors?:\s*/i, "") || ""
-    );
+  const segments: ItemSegment[] = [];
 
-    let productStyle = "";
-    let color = "";
-    let size = "";
-
-    if (styleLine) {
-      // Kiểu A: Type + Color nằm trong dòng "Styles Colors"
-      const separatedStyle = style.split(/\s+-\s+/);
-      const [pStyle = "", ...colorParts] =
-        separatedStyle.length > 1 ? separatedStyle : style.split(/\s+/);
-      productStyle = pStyle;
-      const rawColor = colorParts.join(separatedStyle.length > 1 ? " - " : " ");
-      // Etsy hay gộp size vào color (vd "Gildan 2XL") → tách khi Size trống
-      const sp = splitSizeFromColor(rawColor, sizeRaw);
-      color = sp.color;
-      size = sp.size;
-    } else if (colorRaw) {
-      // Kiểu B: Color đứng riêng; dòng Size chứa Type + Size
-      color = colorRaw;
-      const sp = splitSizeFromColor(sizeRaw, "");
-      productStyle = sp.color; // phần Type (vd "Comfort Color")
-      size = sp.size; // token size cuối (vd "S")
-    } else {
-      // Chỉ có dòng Size: nếu là mã size thuần thì giữ nguyên, không thì tách
-      if (KNOWN_SIZES.includes(sizeRaw.toUpperCase())) {
-        size = sizeRaw;
-      } else {
-        const sp = splitSizeFromColor(sizeRaw, "");
-        productStyle = sp.color;
-        size = sp.size;
-      }
-    }
-    // Bỏ chữ "Color"/"Colors" ở cuối Type (vd "Comfort Color" → "Comfort")
-    const strippedStyle = productStyle.replace(/\s+colou?rs?\s*$/i, "").trim();
-    if (strippedStyle) productStyle = strippedStyle;
-    const personalization = clean(
-      details
-        .find((line) => /^Personalization:\s*/i.test(line))
-        ?.replace(/^Personalization:\s*/i, "") || ""
+  if (skuIndexes.length) {
+    // Định dạng cũ: mỗi item bắt đầu bằng dòng "SKU:".
+    let titleStart = countIndex + 1;
+    skuIndexes.forEach((skuIndex, index) => {
+      const sku = clean(lines[skuIndex].replace(/^SKU:\s*/i, ""));
+      const detailEnd = skuIndexes[index + 1] || lines.length;
+      const details = lines.slice(skuIndex + 1, detailEnd);
+      const title = lines.slice(titleStart, skuIndex).join(" ");
+      // Phần giữa SKU hiện tại và SKU kế còn chứa tiêu đề của item kế tiếp.
+      const lastDetailIndex = details.reduce(
+        (last, line, detailIndex) => (isDetailLine(line) ? detailIndex : last),
+        -1
+      );
+      titleStart = skuIndex + 1 + lastDetailIndex + 1;
+      segments.push({ sku, title, details });
+    });
+  } else {
+    // Layout 2026 (Etsy bỏ dòng SKU): mỗi item mốc theo dòng "Quantity:".
+    // Vùng item = từ sau dòng đếm ("N items") tới trước phần footer quảng cáo.
+    const footerIdx = lines.findIndex(
+      (line, index) =>
+        index > countIndex && /^Love what you bought\??$/i.test(line)
     );
-    const design = designs.find((entry) => entry.sku.toLowerCase() === sku.toLowerCase());
-    const origTitle = clean(title) || productStyle || sku;
-    const origType = productStyle || sku;
-    const baseItem: PodOrderItem = {
-      productName: origTitle,
-      productSku: origType,
-      sku,
-      color,
-      size,
-      personalization,
-      // Chụp bản gốc khách up lên — ô vàng luôn hiển thị cái này, không đổi
-      origTitle,
-      origType,
-      origColor: color,
-      origSize: size,
-      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
-      price: 0,
-      frontUrl: design?.frontUrl || "",
-      backUrl: design?.backUrl || "",
-      mockupUrl: design?.mockupUrl || "",
-      extraAreas: design?.extraAreas || [],
-      note: "",
-    };
-    return {
-      ...baseItem,
-      price: variantUnitPrice(
-        findVariant(variants, baseItem.productSku, size, color),
-        baseItem
-      ),
-    };
-  });
+    const region = lines.slice(countIndex + 1, footerIdx < 0 ? lines.length : footerIdx);
+    const qtyIndexes = region
+      .map((line, index) => ({ line, index }))
+      .filter(({ line }) => /^Quantity:\s*/i.test(line))
+      .map(({ index }) => index);
+
+    let titleStart = 0;
+    qtyIndexes.forEach((qtyIndex) => {
+      const title = region.slice(titleStart, qtyIndex).join(" ");
+      let end = qtyIndex + 1;
+      while (end < region.length && isDetailLine(region[end])) end += 1;
+      const details = region.slice(qtyIndex, end);
+      titleStart = end;
+      segments.push({ sku: "", title, details });
+    });
+  }
+
+  return segments.map((seg) => buildItem(seg, designs, variants));
 }
 
 /** Đọc packing slip PDF của Etsy (mỗi trang tương ứng một đơn hàng). */
@@ -202,7 +242,17 @@ export async function parseEtsyPackingSlipPdf(
       const lines = content.items
         .map((item: any) => clean(item.str || ""))
         .filter(Boolean);
-      const code = lines.find((line) => /^Order\s*#/i.test(line))?.replace(/^Order\s*#/i, "");
+      // Etsy có 2 kiểu ghi mã đơn:
+      //  A) cùng dòng: "Order #4124650591"
+      //  B) tách dòng (layout 2026): "Order" rồi dòng kế "#4124650591"
+      let code = lines
+        .find((line) => /^Order\s*#\s*\d/i.test(line))
+        ?.replace(/^Order\s*#\s*/i, "");
+      if (!code) {
+        const orderIdx = lines.findIndex((line) => /^Order$/i.test(line));
+        const next = orderIdx >= 0 ? lines[orderIdx + 1] || "" : "";
+        if (/^#?\s*\d/.test(next)) code = clean(next.replace(/^#\s*/, ""));
+      }
       const shipTo = lines.findIndex((line) => /^Ship to$/i.test(line));
       const shipEnd = lines.findIndex((line, index) => index > shipTo && /^Scheduled to ship by$/i.test(line));
       if (!code || shipTo < 0 || shipEnd < 0) continue;

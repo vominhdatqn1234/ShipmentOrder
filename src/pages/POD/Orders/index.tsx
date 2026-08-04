@@ -31,6 +31,8 @@ import { useReactToPrint } from "react-to-print";
 import OrdersPackingSlips from "./OrdersPackingSlips";
 import {
   useDesigns,
+  usePodImportQueue,
+  usePodImportQueueMutations,
   usePodOrderMutations,
   usePodOrders,
   usePodVariants,
@@ -76,6 +78,9 @@ export default function Orders() {
   // Khi search: tìm trên tất cả đơn của mọi cửa hàng của seller
   const { orders: allOrders } = usePodOrders({ allStores: true });
   const { add, update, remove, addMany, removeMany } = usePodOrderMutations();
+  const { batches: importBatches } = usePodImportQueue();
+  const { submit: submitImport, remove: removeImportBatch } =
+    usePodImportQueueMutations();
   const { stores } = useStores();
   const { designs } = useDesigns();
   const { variants } = usePodVariants();
@@ -103,6 +108,9 @@ export default function Orders() {
   const [createOpen, setCreateOpen] = useState(false);
   const [presetSku, setPresetSku] = useState<string | undefined>();
   const [importPreview, setImportPreview] = useState<any[]>([]);
+  // Nguồn của danh sách preview: PDF phải qua hàng đợi admin duyệt; CSV giữ luồng cũ.
+  const [importSource, setImportSource] = useState<"pdf" | "csv" | null>(null);
+  const [importFileName, setImportFileName] = useState("");
   const [previewPage, setPreviewPage] = useState(1);
   const [previewPageSize, setPreviewPageSize] = useState(10);
   const [page, setPage] = useState(1);
@@ -134,8 +142,10 @@ export default function Orders() {
         return;
       }
       setImportPreview(preview);
+      setImportSource("pdf");
+      setImportFileName(file.name);
       setPreviewPage(1);
-      message.info(`Đọc được ${preview.length} đơn từ ${file.name} — kiểm tra rồi bấm Đồng bộ lên Web`);
+      message.info(`Đọc được ${preview.length} đơn từ ${file.name} — kiểm tra rồi bấm Gửi admin duyệt`);
     } catch (error) {
       console.error("PDF import error", error);
       message.error("Không thể đọc file PDF. Vui lòng dùng packing slip PDF xuất từ Etsy.");
@@ -538,6 +548,8 @@ export default function Orders() {
       };
     });
     setImportPreview(preview);
+    setImportSource("csv");
+    setImportFileName(file.name);
     setPreviewPage(1);
     message.info(
       `Đọc được ${preview.length} đơn (${rows.length} items) — kiểm tra rồi bấm Xác nhận import`
@@ -596,6 +608,32 @@ export default function Orders() {
   const confirmImport = async () => {
     if (!canCreate) return message.warning(createBlockMsg);
     if (!(await ensureAccount())) return;
+
+    // Đơn từ PDF: KHÔNG ghi thẳng lên hệ thống. Gửi cả lô vào hàng đợi,
+    // admin duyệt xong mới đồng bộ sang podOrders.
+    if (importSource === "pdf") {
+      const store = stores.find((s) => s.id === selectedStoreId);
+      try {
+        await submitImport.mutateAsync({
+          fileName: importFileName,
+          source: "pdf",
+          storeId: selectedStoreId,
+          storeName: store?.name || "",
+          list: importPreview,
+        });
+        message.success(
+          `Đã gửi ${importPreview.length} đơn vào hàng đợi — chờ admin duyệt trước khi lên hệ thống`
+        );
+        setImportPreview([]);
+        setImportSource(null);
+        setImportFileName("");
+      } catch (e) {
+        message.error("Không gửi được lô đơn vào hàng đợi. Vui lòng thử lại.");
+      }
+      return;
+    }
+
+    // CSV: giữ luồng đồng bộ trực tiếp như cũ.
     setSyncProgress({ done: 0, total: importPreview.length });
     try {
       await addMany.mutateAsync({
@@ -604,6 +642,8 @@ export default function Orders() {
       });
       message.success(`Đã đồng bộ ${importPreview.length} đơn hàng lên web`);
       setImportPreview([]);
+      setImportSource(null);
+      setImportFileName("");
       setView("list");
     } finally {
       setSyncProgress(null);
@@ -1152,7 +1192,7 @@ export default function Orders() {
             <Button
               type="primary"
               disabled={!importPreview.length}
-              loading={addMany.isLoading}
+              loading={addMany.isLoading || submitImport.isLoading}
               onClick={confirmImport}
               className={`h-[46px] px-6 rounded-xl font-bold border-0 ${
                 importPreview.length ? "bg-[#C6A15B]" : ""
@@ -1160,6 +1200,8 @@ export default function Orders() {
             >
               {syncProgress
                 ? `Đang đồng bộ ${syncProgress.done}/${syncProgress.total}...`
+                : importSource === "pdf"
+                ? "Gửi admin duyệt"
                 : "Đồng bộ lên Web"}
             </Button>
             <input
@@ -1212,9 +1254,64 @@ export default function Orders() {
             importPreview.length > 0 && (
               <div className="bg-[#EFF4FF] border border-[#D6E4FF] text-[#2563EB] rounded-2xl px-5 py-4 font-bold">
                 Đã chuẩn bị {importPreview.length} đơn hàng. Kiểm tra bên dưới rồi
-                bấm "Đồng bộ lên Web".
+                bấm{" "}
+                {importSource === "pdf"
+                  ? '"Gửi admin duyệt". Đơn từ PDF sẽ vào hàng đợi và chỉ lên hệ thống sau khi admin duyệt.'
+                  : '"Đồng bộ lên Web".'}
               </div>
             )
+          )}
+
+          {/* Lô PDF đã gửi — theo dõi trạng thái duyệt của admin */}
+          {importBatches.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-2">
+              <div className="font-bold text-[#171826] text-sm mb-1">
+                Lô đơn PDF đã gửi
+              </div>
+              {importBatches.slice(0, 8).map((b) => {
+                const st =
+                  b.status === "approved"
+                    ? { label: "ĐÃ DUYỆT", color: "#15803D", bg: "#E8F7EC" }
+                    : b.status === "rejected"
+                    ? { label: "BỊ TỪ CHỐI", color: "#B91C1C", bg: "#FDECEC" }
+                    : { label: "CHỜ DUYỆT", color: "#6B46C1", bg: "#F3EBFF" };
+                return (
+                  <div
+                    key={b.id}
+                    className="flex items-center gap-3 flex-wrap text-sm border-b border-gray-50 last:border-0 py-1.5"
+                  >
+                    <span
+                      className="text-[10px] font-bold tracking-wider px-2 py-1 rounded whitespace-nowrap"
+                      style={{ color: st.color, background: st.bg }}
+                    >
+                      {st.label}
+                    </span>
+                    <span className="font-semibold text-[#171826]">
+                      {b.fileName || "PDF"}
+                    </span>
+                    <span className="text-gray-400">{b.count} đơn</span>
+                    {b.status === "rejected" && b.rejectedReason && (
+                      <span className="text-red-500">— {b.rejectedReason}</span>
+                    )}
+                    <span className="text-gray-300 ml-auto">
+                      {b.created ? dayjs(b.created).format("DD/MM HH:mm") : ""}
+                    </span>
+                    {b.status === "pending" && (
+                      <Popconfirm
+                        title="Rút lô đơn này khỏi hàng đợi?"
+                        okText="Rút"
+                        cancelText="Hủy"
+                        onConfirm={() => removeImportBatch.mutate(b.id)}
+                      >
+                        <button className="text-xs text-gray-400 hover:text-red-500 border-0 bg-transparent cursor-pointer">
+                          Rút lại
+                        </button>
+                      </Popconfirm>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
 
           <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4 overflow-x-auto">

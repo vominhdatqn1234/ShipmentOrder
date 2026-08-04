@@ -32,6 +32,7 @@ const colorsRef = collection(firestore, "podColors");
 const productsRef = collection(firestore, "baseProducts");
 const designsRef = collection(firestore, "designs");
 const ordersRef = collection(firestore, "podOrders");
+const importQueueRef = collection(firestore, "podImportQueue");
 
 function snapshotToList<T>(snapshot: any): T[] {
   const out: T[] = [];
@@ -253,6 +254,92 @@ export function usePodOrderMutations() {
     { onSuccess: invalidate }
   );
   return { add, addMany, update, remove, removeMany };
+}
+
+/* ---------------- Hàng đợi import PDF (chờ admin duyệt) ---------------- */
+
+export type PodImportBatch = {
+  id: string;
+  storeId?: string;
+  storeName?: string;
+  userId?: string;
+  sellerName?: string;
+  fileName?: string;
+  source?: string;
+  status: "pending" | "approved" | "rejected";
+  count: number;
+  orders: { id?: string; data: any }[];
+  rejectedReason?: string;
+  reviewedAt?: string;
+  created?: string;
+};
+
+/** Các lô đơn seller đã gửi chờ duyệt (để seller theo dõi trạng thái). */
+export function usePodImportQueue() {
+  const { user } = useUser();
+  const userId = user?.id || "";
+  const q = useQuery(
+    ["pod-import-queue", userId],
+    () =>
+      getDocs(
+        query(
+          importQueueRef,
+          where("userId", "==", userId),
+          orderBy("created", "desc")
+        )
+      ),
+    { enabled: !!userId }
+  );
+  return { ...q, batches: snapshotToList<PodImportBatch>(q.data) };
+}
+
+export function usePodImportQueueMutations() {
+  const qc = useQueryClient();
+  const { user } = useUser();
+  const userId = user?.id || "";
+  const sellerName = user?.name || user?.email || "";
+  const invalidate = () => qc.invalidateQueries(["pod-import-queue"]);
+
+  /** Gửi 1 lô đơn (parse từ PDF) vào hàng đợi chờ admin duyệt. */
+  const submit = useMutation(
+    ({
+      fileName,
+      source = "pdf",
+      storeId,
+      storeName,
+      list,
+    }: {
+      fileName: string;
+      source?: string;
+      storeId?: string;
+      storeName?: string;
+      list: { id?: string; data: any }[];
+    }) =>
+      addDoc(importQueueRef, {
+        userId,
+        sellerName,
+        storeId: storeId || "",
+        storeName: storeName || "",
+        fileName,
+        source,
+        status: "pending",
+        count: list.length,
+        orders: list,
+        rejectedReason: "",
+        reviewedBy: "",
+        reviewedAt: "",
+        created: new Date().toISOString(),
+      }),
+    { onSuccess: invalidate }
+  );
+
+  /** Seller rút 1 lô đang chờ (chưa duyệt). */
+  const remove = useMutation(
+    (id: string) => deleteDoc(doc(importQueueRef, id)),
+    { onSuccess: invalidate }
+  );
+
+  return { submit, remove };
 }
 
 /**

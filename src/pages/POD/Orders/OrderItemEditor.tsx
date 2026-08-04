@@ -235,6 +235,31 @@ function OrderItemEditor({
         .filter(Boolean)
     )
   );
+  // Bảng màu chuẩn của admin (dùng để seller chọn lại khi màu Etsy bị gộp).
+  const adminColorNames = Array.from(
+    new Set((podColors || []).map((c) => (c.name || "").trim()).filter(Boolean))
+  );
+  // Màu để chọn = màu của phôi (bảng giá) + toàn bộ bảng màu admin.
+  const colorChoices = Array.from(
+    new Set([...productColors, ...adminColorNames])
+  ).sort((a, b) => a.localeCompare(b));
+  // Màu Etsy hiện tại có "chuẩn" không (khớp bảng màu admin / màu phôi)?
+  // Màu gộp kiểu "Navy/True Navy" sẽ không khớp -> cần seller chọn lại.
+  const colorIsStandard =
+    !item.color ||
+    colorChoices.some(
+      (c) => c.toLowerCase() === (item.color || "").trim().toLowerCase()
+    );
+  // Gợi ý tách màu gộp "A/B": phần nào trùng bảng màu admin thì đề xuất.
+  const suggestedColor =
+    !colorIsStandard && item.color?.includes("/")
+      ? item.color
+          .split("/")
+          .map((p) => p.trim())
+          .find((p) =>
+            colorChoices.some((c) => c.toLowerCase() === p.toLowerCase())
+          )
+      : undefined;
   const productSizes = Array.from(
     new Set(
       variants
@@ -463,21 +488,23 @@ function OrderItemEditor({
           }
         />
         <div className="flex gap-2">
-          {/* Màu/Size lấy từ Bảng giá phôi POD (admin); giá trị hiện tại
-              (từ Etsy) vẫn giữ trong danh sách để xem/đổi qua lại được */}
+          {/* Màu chọn từ bảng màu admin + màu phôi. Màu Etsy gộp (vd
+              "Navy/True Navy") không chuẩn -> viền vàng nhắc seller chọn lại. */}
           <Select
             className="flex-1 min-w-0"
             placeholder="Chọn Màu"
             allowClear
             showSearch
+            status={colorIsStandard ? undefined : "warning"}
             value={item.color || undefined}
             onChange={(v) => onPatchItem({ color: v || "" })}
-            options={Array.from(
-              new Set([
-                ...productColors,
-                ...(item.color ? [item.color] : []),
-              ])
-            ).map((c) => ({ value: c, label: c }))}
+            options={[
+              // Giữ màu Etsy gộp ở đầu (để không mất) nhưng ghi rõ cần chọn lại
+              ...(item.color && !colorIsStandard
+                ? [{ value: item.color, label: `${item.color} (Etsy — chọn lại)` }]
+                : []),
+              ...colorChoices.map((c) => ({ value: c, label: c })),
+            ]}
           />
           <Select
             className="flex-1 min-w-0"
@@ -505,6 +532,19 @@ function OrderItemEditor({
             />
           </div>
         </div>
+        {!colorIsStandard && (
+          <div className="flex items-center gap-2 flex-wrap bg-[#FFF7ED] border border-[#FED7AA] text-[#C2410C] rounded-lg px-3 py-1.5 text-[11px]">
+            <span className="font-bold">⚠ Màu "{item.color}" không có trong bảng màu — chọn lại màu chuẩn.</span>
+            {suggestedColor && (
+              <button
+                onClick={() => onPatchItem({ color: suggestedColor })}
+                className="font-bold text-[#C2410C] underline border-0 bg-transparent cursor-pointer"
+              >
+                Dùng "{suggestedColor}"
+              </button>
+            )}
+          </div>
+        )}
         <input
           key={item.note}
           defaultValue={item.note}
