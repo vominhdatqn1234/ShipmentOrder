@@ -5,7 +5,7 @@
   publish = "build"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "24"
   # CRA coi warning là error khi CI=true (mặc định trên Netlify) -> tắt đi
   CI = "false"
   # Tránh out-of-memory khi build CRA lớn
