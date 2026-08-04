@@ -1,11 +1,11 @@
 # Netlify config — ADMIN site (base directory = admin-portal)
-# admin-portal dùng chung node_modules với root, nên phải install deps ở root trước khi build
+# admin-portal giờ có package.json độc lập -> build riêng, không cần deps ở root.
 [build]
-  command = "cd .. && yarn install --frozen-lockfile && cd admin-portal && yarn build"
+  command = "yarn build"
   publish = "build"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
   CI = "false"
   NODE_OPTIONS = "--max-old-space-size=4096"
 
