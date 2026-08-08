@@ -166,6 +166,33 @@ export async function sbDelete(table: string, id: string): Promise<void> {
   await handle(res);
 }
 
+/**
+ * Xoá NHIỀU id trong 1 request (PostgREST `id=in.(...)`), chia lô 100 để tránh
+ * URL quá dài. Nhanh hơn hẳn so với xoá lần lượt từng id.
+ */
+export async function sbDeleteMany(
+  table: string,
+  ids: string[],
+  onProgress?: (done: number, total: number) => void
+): Promise<void> {
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  const CHUNK = 100;
+  let done = 0;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const batch = unique.slice(i, i + CHUNK);
+    const inList = batch
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(",");
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${table}?id=in.(${encodeURIComponent(inList)})`,
+      { method: "DELETE", headers: baseHeaders }
+    );
+    await handle(res);
+    done += batch.length;
+    onProgress?.(done, unique.length);
+  }
+}
+
 /* ---------------- Storage ---------------- */
 
 export const STORAGE_BUCKET = "uploads";

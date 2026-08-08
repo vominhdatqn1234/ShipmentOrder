@@ -16,7 +16,7 @@ import {
   where,
 } from "lib/db";
 import { firestore } from "lib/firebase";
-import { sbSelectAll } from "lib/supabase";
+import { sbSelectAll, sbUpsert, sbDeleteMany } from "lib/supabase";
 import {
   BaseProduct,
   Design,
@@ -33,6 +33,16 @@ const productsRef = collection(firestore, "baseProducts");
 const designsRef = collection(firestore, "designs");
 const ordersRef = collection(firestore, "podOrders");
 const importQueueRef = collection(firestore, "podImportQueue");
+
+// Sinh id ngẫu nhiên (giống lib/db) cho các dòng import chưa có id.
+function genId(): string {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "";
+  for (let i = 0; i < 20; i++)
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  return id;
+}
 
 function snapshotToList<T>(snapshot: any): T[] {
   const out: T[] = [];
@@ -217,13 +227,16 @@ export function usePodOrderMutations() {
       list: { id?: string; data: Partial<PodOrder> }[];
       onProgress?: (done: number, total: number) => void;
     }) => {
-      let done = 0;
-      for (const row of list) {
-        const data = { ...row.data, userId };
-        if (row.id) await setDoc(doc(ordersRef, row.id), data);
-        else await addDoc(ordersRef, data);
-        done += 1;
-        onProgress?.(done, list.length);
+      // Chèn hàng loạt: mỗi request tối đa 500 dòng (thay vì 1 dòng/1 request).
+      const rows = list.map((row) => ({
+        id: row.id || genId(),
+        ...(row.data as any),
+        userId,
+      }));
+      const CHUNK = 500;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        await sbUpsert(ordersRef.table, rows.slice(i, i + CHUNK));
+        onProgress?.(Math.min(i + CHUNK, rows.length), rows.length);
       }
     },
     { onSuccess: invalidate }
@@ -244,12 +257,8 @@ export function usePodOrderMutations() {
       ids: string[];
       onProgress?: (done: number, total: number) => void;
     }) => {
-      let done = 0;
-      for (const id of ids) {
-        await deleteDoc(doc(ordersRef, id));
-        done += 1;
-        onProgress?.(done, ids.length);
-      }
+      // Xoá hàng loạt trong ít request nhất (id=in.(...)) -> nhanh hơn nhiều.
+      await sbDeleteMany(ordersRef.table, ids, onProgress);
     },
     { onSuccess: invalidate }
   );

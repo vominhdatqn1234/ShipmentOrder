@@ -13,7 +13,7 @@ import {
   updateDoc,
   where,
 } from "../lib/db";
-import { sbSelectAll, sbDeleteMany } from "../lib/supabase";
+import { sbSelectAll, sbDeleteMany, sbUpsert } from "../lib/supabase";
 import {
   BaseProduct,
   DesignRequest,
@@ -49,6 +49,16 @@ const trackingsRef = collection(db, "trackings");
 const printHousesRef = collection(db, "printHouses");
 const printHouseSkusRef = collection(db, "printHouseSkus");
 const importQueueRef = collection(db, "podImportQueue");
+
+// Sinh id ngẫu nhiên cho dòng import chưa có id.
+function genId(): string {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "";
+  for (let i = 0; i < 20; i++)
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  return id;
+}
 
 function toList<T>(snapshot: any): T[] {
   const out: T[] = [];
@@ -200,13 +210,16 @@ export function useImportQueueMutations() {
       onProgress?: (done: number, total: number) => void;
     }) => {
       const list = batch.orders || [];
-      let done = 0;
-      for (const row of list) {
-        const data = { ...row.data, userId: batch.userId || "" };
-        if (row.id) await setDoc(doc(ordersRef, row.id), data);
-        else await addDoc(ordersRef, data);
-        done += 1;
-        onProgress?.(done, list.length);
+      // Chèn hàng loạt: mỗi request tối đa 500 đơn (thay vì 1 đơn/1 request).
+      const rows = list.map((row) => ({
+        id: row.id || genId(),
+        ...(row.data as any),
+        userId: batch.userId || "",
+      }));
+      const CHUNK = 500;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        await sbUpsert("podOrders", rows.slice(i, i + CHUNK));
+        onProgress?.(Math.min(i + CHUNK, rows.length), rows.length);
       }
       await updateDoc(doc(importQueueRef, batch.id), {
         status: "approved",
