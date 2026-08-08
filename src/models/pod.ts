@@ -264,6 +264,8 @@ export interface PodOrder {
   refundedAmount?: number | null;
   /** Thời điểm hoàn tiền (để thống kê theo tháng) */
   refundedAt?: string | null;
+  /** Tin nhắn khách (lấy từ Personalization của Etsy) — dùng cho CS bên admin */
+  csCustomerMsg?: string;
 }
 
 export const GOLD = "#C6A15B";

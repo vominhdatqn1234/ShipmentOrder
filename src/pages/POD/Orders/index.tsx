@@ -104,6 +104,7 @@ export default function Orders() {
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [trackFilter, setTrackFilter] = useState<"all" | "has" | "none">("all");
   const [editing, setEditing] = useState<PodOrder | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [presetSku, setPresetSku] = useState<string | undefined>();
@@ -203,9 +204,11 @@ export default function Orders() {
         return false;
       if (toDate && dayjs(o.created).isAfter(dayjs(toDate), "day"))
         return false;
+      if (trackFilter === "has" && !(o.tracking || "").trim()) return false;
+      if (trackFilter === "none" && (o.tracking || "").trim()) return false;
       return true;
     });
-  }, [orders, allOrders, statusTab, search, fromDate, toDate]);
+  }, [orders, allOrders, statusTab, search, fromDate, toDate, trackFilter]);
 
   const paged = useMemo(
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
@@ -213,7 +216,7 @@ export default function Orders() {
   );
   useEffect(() => {
     setPage(1);
-  }, [statusTab, search, fromDate, toDate]);
+  }, [statusTab, search, fromDate, toDate, trackFilter]);
 
   // Bỏ selection của các đơn không còn tồn tại
   useEffect(() => {
@@ -411,7 +414,7 @@ export default function Orders() {
         ["Order ID", "Date", "Status", "Tracking", "Customer", "Address", "City", "State", "Zip", "Country", "Items", "Total"],
         filtered.map((o) => [
           o.orderCode,
-          dayjs(o.created).format("MM/DD/YYYY"),
+          o.created ? dayjs(o.created).format("MM/DD/YYYY") : "",
           POD_STATUS[o.status]?.label || o.status,
           o.tracking || "",
           o.customerName || "",
@@ -489,14 +492,27 @@ export default function Orders() {
       byOrder.get(oid)!.push(r);
     });
     const store = stores.find((s) => s.id === selectedStoreId);
+    // Ngày kiểu M/D/YY hoặc M/D/YYYY -> ISO (chấp nhận cả 1 chữ số).
     const toISO = (d: string) => {
-      const m = (d || "").match(/^(\d{2})\/(\d{2})\/(\d{2,4})$/);
-      if (!m) return new Date().toISOString();
+      const m = (d || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+      if (!m) return "";
       const y = m[3].length === 2 ? `20${m[3]}` : m[3];
-      return new Date(`${y}-${m[1]}-${m[2]}T00:00:00Z`).toISOString();
+      const pad = (x: string) => x.padStart(2, "0");
+      return new Date(`${y}-${pad(m[1])}-${pad(m[2])}T00:00:00Z`).toISOString();
     };
     const preview = Array.from(byOrder.entries()).map(([oid, items]) => {
-      const f = items[0];
+      // Lấy giá trị field đơn từ dòng ĐẦU TIÊN có dữ liệu (đơn nhiều dòng /
+      // Etsy để trống ở một số dòng). Tránh vớ phải dòng trống.
+      const pick = (key: string) =>
+        (items.find((r: any) => (r[key] || "").trim())?.[key] || "").trim();
+      // Ngày lên đơn: ưu tiên Sale Date, thiếu thì lấy Date Paid.
+      // Ngày lên đơn: ưu tiên Sale Date -> Date Paid -> Date Shipped (một số đơn
+      // trong file chỉ còn Date Shipped). Không có gì thì để TRỐNG ("—").
+      const created =
+        toISO(pick("Sale Date")) ||
+        toISO(pick("Date Paid")) ||
+        toISO(pick("Date Shipped")) ||
+        "";
       return {
         id: `etsy-${oid}`,
         data: {
@@ -506,29 +522,39 @@ export default function Orders() {
           status: "pending_payment",
           tracking: "",
           source: "etsy",
-          customerName: f["Ship Name"] || f["Buyer"],
+          // Tên khách: ưu tiên Buyer ĐẦY ĐỦ (kèm username như trong file),
+          // thiếu thì lấy Ship Name. Không có thì để trống (UI hiện "--").
+          customerName: pick("Buyer") || pick("Ship Name"),
           customerEmail: "",
           customerPhone: "",
-          address1: f["Ship Address1"],
-          address2: f["Ship Address2"],
-          city: f["Ship City"],
-          state: f["Ship State"],
-          zip: f["Ship Zipcode"],
-          country: f["Ship Country"] || "United States",
+          address1: pick("Ship Address1"),
+          address2: pick("Ship Address2"),
+          city: pick("Ship City"),
+          state: pick("Ship State"),
+          zip: pick("Ship Zipcode"),
+          country: pick("Ship Country") || "United States",
           items: items.map((it: any) => {
             const v = parseVariations(it["Variations"]);
             const csvSku = (it["SKU"] || "").trim();
-            // Tự đồng bộ link thiết kế từ thư viện nếu SKU đã có sẵn
+            // Type/Màu lấy TỪ VARIATIONS (Styles/Colors), không lấy từ cột SKU.
+            // Không có trong Variations thì để trống.
+            const typeVal = v.style;
+            // Tự đồng bộ link thiết kế từ thư viện nếu SKU (thiết kế) khớp
             const design = designs.find(
               (d) => d.sku.toLowerCase() === csvSku.toLowerCase()
             );
             return {
-              productName: it["Item Name"],
-              productSku: csvSku,
+              productName: it["Item Name"] || typeVal || "",
+              productSku: typeVal,
               sku: csvSku,
               color: v.color,
               size: v.size,
               personalization: v.personalization,
+              // Bản gốc khách up (ô vàng) — set sẵn để không bị suy ra từ SKU
+              origTitle: it["Item Name"] || typeVal || "",
+              origType: typeVal,
+              origColor: v.color,
+              origSize: v.size,
               quantity: parseInt(it["Quantity"]) || 1,
               price: parseFloat(it["Price"]) || 0,
               frontUrl: design?.frontUrl || "",
@@ -539,11 +565,16 @@ export default function Orders() {
             };
           }),
           note: "",
+          // Tin nhắn khách = Personalization trong Variations (gộp nếu nhiều SP)
+          csCustomerMsg: items
+            .map((it: any) => parseVariations(it["Variations"]).personalization)
+            .filter(Boolean)
+            .join(" | "),
           total: items.reduce(
             (s: number, it: any) => s + (parseFloat(it["Item Total"]) || 0),
             0
           ),
-          created: toISO(f["Sale Date"]),
+          created,
         },
       };
     });
@@ -636,11 +667,18 @@ export default function Orders() {
     // CSV: giữ luồng đồng bộ trực tiếp như cũ.
     setSyncProgress({ done: 0, total: importPreview.length });
     try {
-      await addMany.mutateAsync({
+      const res = await addMany.mutateAsync({
         list: importPreview,
         onProgress: (done, total) => setSyncProgress({ done, total }),
       });
-      message.success(`Đã đồng bộ ${importPreview.length} đơn hàng lên web`);
+      const okCount = importPreview.length - (res?.failed || 0);
+      if (res?.failed) {
+        message.warning(
+          `Đã đồng bộ ${okCount}/${importPreview.length} đơn — ${res.failed} đơn lỗi dữ liệu bị bỏ qua`
+        );
+      } else {
+        message.success(`Đã đồng bộ ${importPreview.length} đơn hàng lên web`);
+      }
       setImportPreview([]);
       setImportSource(null);
       setImportFileName("");
@@ -741,6 +779,16 @@ export default function Orders() {
                 setFromDate(range?.[0] ? range[0].format("YYYY-MM-DD") : "");
                 setToDate(range?.[1] ? range[1].format("YYYY-MM-DD") : "");
               }}
+            />
+            <Select
+              className="h-[42px] w-[180px]"
+              value={trackFilter}
+              onChange={(v) => setTrackFilter(v)}
+              options={[
+                { value: "all", label: "Tất cả tracking" },
+                { value: "has", label: "Đã có tracking" },
+                { value: "none", label: "Chưa có tracking" },
+              ]}
             />
             <Button
               icon={<FiDownload />}
@@ -1031,7 +1079,7 @@ export default function Orders() {
                       <StatusBadge status={o.status} />
                     </td>
                     <td className="p-3 whitespace-nowrap">
-                      {dayjs(o.created).format("DD/MM/YYYY")}
+                      {o.created ? dayjs(o.created).format("DD/MM/YYYY") : "—"}
                     </td>
                     <td className="p-3">
                       {o.tracking ? (
@@ -1376,10 +1424,14 @@ export default function Orders() {
                   </td>
                   <td className="p-3 font-bold">{row.data.orderCode}</td>
                   <td className="p-3">
-                    {dayjs(row.data.created).format("DD/MM/YYYY")}
+                    {row.data.created
+                      ? dayjs(row.data.created).format("DD/MM/YYYY")
+                      : "—"}
                   </td>
                   <td className="p-3 font-bold text-[#171826]">
-                    {row.data.customerName}
+                    {row.data.customerName || (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   <td className="p-3">
                     <div className="space-y-2">

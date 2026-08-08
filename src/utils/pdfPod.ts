@@ -17,6 +17,37 @@ export type PdfOrderPreview = {
 
 const clean = (value = "") => value.replace(/\s+/g, " ").trim();
 
+// Parse ngày Etsy kiểu "Apr 7, 2026" ổn định trên MỌI trình duyệt (không dựa
+// vào new Date(string) vốn khác nhau giữa Chrome/Safari).
+const MONTHS: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+function parseEtsyDate(raw?: string): Date | null {
+  const s = clean(raw || "");
+  if (!s) return null;
+  const m = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/);
+  if (m) {
+    const mo = MONTHS[m[1].slice(0, 3).toLowerCase()];
+    if (mo !== undefined) {
+      const d = new Date(Date.UTC(Number(m[3]), mo, Number(m[2])));
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+  }
+  const fallback = new Date(s); // dự phòng cho định dạng khác
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+// Tìm dòng ngày ngay dưới một nhãn — quét vài dòng phòng khi layout tách dòng.
+function findDateAfter(lines: string[], labelRe: RegExp): Date | null {
+  const idx = lines.findIndex((l) => labelRe.test(l));
+  if (idx < 0) return null;
+  for (let i = idx + 1; i <= idx + 3 && i < lines.length; i += 1) {
+    const d = parseEtsyDate(lines[i]);
+    if (d) return d;
+  }
+  return null;
+}
+
 // Netlify cần một URL tĩnh cho PDF worker. `new URL(..., import.meta.url)`
 // có thể sinh asset URL không tồn tại sau SPA redirect, khiến getDocument báo
 // "Không thể đọc file PDF" dù file Etsy hoàn toàn hợp lệ.
@@ -257,15 +288,12 @@ export async function parseEtsyPackingSlipPdf(
       const shipEnd = lines.findIndex((line, index) => index > shipTo && /^Scheduled to ship by$/i.test(line));
       if (!code || shipTo < 0 || shipEnd < 0) continue;
 
-      const orderDateIndex = lines.findIndex((line) => /^Order date$/i.test(line));
-      const orderDate = orderDateIndex >= 0 ? lines[orderDateIndex + 1] : "";
-      const shipByIndex = lines.findIndex((line) => /^Scheduled to ship by$/i.test(line));
-      const shipByDate = shipByIndex >= 0 ? new Date(lines[shipByIndex + 1]) : null;
+      const shipByDate = findDateAfter(lines, /^Scheduled to ship by$/i);
       const items = parseItems(lines, options.designs, options.variants);
       if (!items.length) continue;
       const address = parseAddress(lines.slice(shipTo + 1, shipEnd));
       const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      const createdDate = new Date(orderDate);
+      const createdDate = findDateAfter(lines, /^Order date$/i);
 
       previews.push({
         id: `etsy-pdf-${code}-${pageNumber}`,
@@ -281,14 +309,15 @@ export async function parseEtsyPackingSlipPdf(
           ...address,
           items,
           note: `Imported from ${file.name}`,
+          // Tin nhắn khách = Personalization của các item (gộp nếu nhiều)
+          csCustomerMsg: items
+            .map((it) => (it.personalization || "").trim())
+            .filter(Boolean)
+            .join(" | "),
           total,
-          shipBy:
-            shipByDate && !Number.isNaN(shipByDate.getTime())
-              ? shipByDate.toISOString()
-              : null,
-          created: Number.isNaN(createdDate.getTime())
-            ? new Date().toISOString()
-            : createdDate.toISOString(),
+          shipBy: shipByDate ? shipByDate.toISOString() : null,
+          // Không đọc được ngày -> để TRỐNG (hiển thị "—"), không bịa hôm nay.
+          created: createdDate ? createdDate.toISOString() : "",
         },
       });
     } catch (error) {

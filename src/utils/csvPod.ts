@@ -60,20 +60,37 @@ export function downloadCSV(filename: string, csv: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** Parse Variations của Etsy: "Unisex shirt size:L US letter,Personalization:Merced -10" */
+/**
+ * Parse Variations của Etsy.
+ * Nhãn "Styles - Colors: <Style> <Color>" gộp cả kiểu phôi và màu:
+ *   "Youth Black"      -> style "Youth",   color "Black"   (tách theo khoảng trắng)
+ *   "Comfort - Pepper" -> style "Comfort", color "Pepper"  (tách theo " - ")
+ * Không có thì để trống (KHÔNG suy ra từ SKU).
+ */
 export function parseVariations(v: string): {
+  style: string;
   color: string;
   size: string;
   personalization: string;
 } {
-  const out = { color: "", size: "", personalization: "" };
+  const out = { style: "", color: "", size: "", personalization: "" };
   (v || "").split(",").forEach((part) => {
     const idx = part.indexOf(":");
     if (idx < 0) return;
     const key = part.slice(0, idx).trim().toLowerCase();
     const value = part.slice(idx + 1).trim();
-    if (key.includes("color")) out.color = value;
-    else if (key.includes("size")) out.size = value;
+    if (key.includes("style")) {
+      // "Styles - Colors" / "Styles Colors": phần đầu = Style, phần sau = Color
+      const dash = value.split(/\s+-\s+/);
+      const parts = dash.length > 1 ? dash : value.split(/\s+/);
+      out.style = (parts[0] || "").trim();
+      out.color = parts
+        .slice(1)
+        .join(dash.length > 1 ? " - " : " ")
+        .trim();
+    } else if (key.includes("color")) {
+      out.color = value; // dòng "Colors" đứng riêng
+    } else if (key.includes("size")) out.size = value;
     else if (key.includes("personalization")) out.personalization = value;
   });
   return out;

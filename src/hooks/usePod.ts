@@ -202,7 +202,10 @@ export function usePodOrders(opts?: { allStores?: boolean }) {
           ordersRef,
           where("userId", "==", userId),
           ...(byStore ? [where("storeId", "==", selectedStoreId)] : []),
-          orderBy("created", "desc")
+          // Khóa phụ "id" để thứ tự ỔN ĐỊNH — đơn cùng ngày `created` không bị
+          // xáo trộn mỗi lần tải lại (giữ đúng thứ tự sau khi import).
+          orderBy("created", "desc"),
+          orderBy("id", "asc")
         )
       ),
     { enabled: !!userId }
@@ -227,17 +230,31 @@ export function usePodOrderMutations() {
       list: { id?: string; data: Partial<PodOrder> }[];
       onProgress?: (done: number, total: number) => void;
     }) => {
-      // Chèn hàng loạt: mỗi request tối đa 500 dòng (thay vì 1 dòng/1 request).
+      // Chèn cả lô 500 dòng cho NHANH; lô nào lỗi mới chèn lại TỪNG dòng để
+      // dòng hợp lệ vẫn vào, chỉ bỏ dòng xấu. Upsert theo id -> không nhân đôi.
       const rows = list.map((row) => ({
         id: row.id || genId(),
         ...(row.data as any),
         userId,
       }));
       const CHUNK = 500;
+      let failed = 0;
       for (let i = 0; i < rows.length; i += CHUNK) {
-        await sbUpsert(ordersRef.table, rows.slice(i, i + CHUNK));
+        const chunk = rows.slice(i, i + CHUNK);
+        try {
+          await sbUpsert(ordersRef.table, chunk);
+        } catch {
+          for (const r of chunk) {
+            try {
+              await sbUpsert(ordersRef.table, [r]);
+            } catch {
+              failed += 1;
+            }
+          }
+        }
         onProgress?.(Math.min(i + CHUNK, rows.length), rows.length);
       }
+      return { total: rows.length, failed };
     },
     { onSuccess: invalidate }
   );
@@ -294,7 +311,8 @@ export function usePodImportQueue() {
         query(
           importQueueRef,
           where("userId", "==", userId),
-          orderBy("created", "desc")
+          orderBy("created", "desc"),
+          orderBy("id", "asc")
         )
       ),
     { enabled: !!userId }

@@ -343,7 +343,9 @@ export default function OverviewDetail() {
                                 {o.orderCode}
                               </td>
                               <td className="py-2 text-gray-500">
-                                {dayjs(o.created).format("DD/MM/YYYY")}
+                                {o.created
+                                  ? dayjs(o.created).format("DD/MM/YYYY")
+                                  : "—"}
                               </td>
                               <td className="py-2">
                                 <span
@@ -485,7 +487,10 @@ export default function OverviewDetail() {
                 </div>
                 <div>Shop: {detailOrder.storeName || "—"}</div>
                 <div>
-                  Ngày tạo: {dayjs(detailOrder.created).format("DD/MM/YYYY")}
+                  Ngày tạo:{" "}
+                  {detailOrder.created
+                    ? dayjs(detailOrder.created).format("DD/MM/YYYY")
+                    : "—"}
                 </div>
                 {detailOrder.datePaid && (
                   <div>

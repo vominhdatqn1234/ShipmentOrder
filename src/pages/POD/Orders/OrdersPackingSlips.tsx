@@ -66,7 +66,7 @@ const OrdersPackingSlips = forwardRef<
               <h2>Đơn #{o.orderCode}</h2>
               <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
                 {o.storeName || ""} ·{" "}
-                {dayjs(o.created).format("DD/MM/YYYY")}
+                {o.created ? dayjs(o.created).format("DD/MM/YYYY") : "—"}
               </div>
             </div>
             <div style={{ textAlign: "right", fontSize: 12 }}>
