@@ -565,11 +565,8 @@ export default function Orders() {
             };
           }),
           note: "",
-          // Tin nhắn khách = Personalization trong Variations (gộp nếu nhiều SP)
-          csCustomerMsg: items
-            .map((it: any) => parseVariations(it["Variations"]).personalization)
-            .filter(Boolean)
-            .join(" | "),
+          // Tin nhắn khách để TRỐNG, nhân viên tự nhập tay (không lấy Personalization)
+          csCustomerMsg: "",
           total: items.reduce(
             (s: number, it: any) => s + (parseFloat(it["Item Total"]) || 0),
             0

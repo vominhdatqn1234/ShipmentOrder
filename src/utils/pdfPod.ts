@@ -309,11 +309,8 @@ export async function parseEtsyPackingSlipPdf(
           ...address,
           items,
           note: `Imported from ${file.name}`,
-          // Tin nhắn khách = Personalization của các item (gộp nếu nhiều)
-          csCustomerMsg: items
-            .map((it) => (it.personalization || "").trim())
-            .filter(Boolean)
-            .join(" | "),
+          // Tin nhắn khách để TRỐNG, nhân viên tự nhập tay (không lấy Personalization)
+          csCustomerMsg: "",
           total,
           shipBy: shipByDate ? shipByDate.toISOString() : null,
           // Không đọc được ngày -> để TRỐNG (hiển thị "—"), không bịa hôm nay.
