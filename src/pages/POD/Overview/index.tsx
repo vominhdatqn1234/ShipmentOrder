@@ -13,7 +13,12 @@ import {
 } from "react-icons/fi";
 import { usePodOrders, useStores } from "../../../hooks/usePod";
 import { usePodStore } from "../../../store/usePodStore";
-import { POD_STATUS, PodOrderStatus } from "../../../models/pod";
+import {
+  POD_STATUS,
+  PodOrderStatus,
+  financePeriodKey,
+} from "../../../models/pod";
+import ShopFinanceTable from "./ShopFinanceTable";
 
 type Period = "day" | "week" | "month" | "quarter" | "year";
 
@@ -151,21 +156,13 @@ export default function Overview() {
     refund,
   } = cur;
 
-  // Breakdown theo shop (chỉ kỳ này): tổng chi tiêu + số đơn từng shop
-  const shopRows = useMemo(() => {
-    const map = new Map<string, { name: string; spend: number; count: number }>();
-    filtered.forEach((o: any) => {
-      const key = o.storeId || o.storeName || "—";
-      const name = o.storeName || o.storeId || "Không rõ shop";
-      const row = map.get(key) || { name, spend: 0, count: 0 };
-      row.count += 1;
-      if (!["pending_payment", "cancelled"].includes(o.status)) {
-        row.spend += o.total || 0;
-      }
-      map.set(key, row);
-    });
-    return Array.from(map.values()).sort((a, b) => b.spend - a.spend);
-  }, [filtered]);
+  // Bảng tài chính theo shop: shop đang chọn, hoặc tất cả shop khi scope = "all"
+  const financeStores = useMemo(
+    () => (isAll ? stores : activeStore ? [activeStore] : []),
+    [isAll, stores, activeStore]
+  );
+  // Khoá kỳ để lưu số liệu khách tự nhập (mỗi kỳ 1 bản ghi/shop)
+  const periodKey = financePeriodKey(period, dayjs());
 
   // % thay đổi thật so với kỳ trước → chuỗi + màu
   const delta = (c: number, p: number) => {
@@ -355,48 +352,17 @@ export default function Overview() {
         />
       </div>
 
-      {/* Breakdown theo shop */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5">
-        <h3 className="font-bold text-[#171826] text-lg mt-0 mb-4">
-          Theo shop
-        </h3>
-        {shopRows.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="text-gray-500 text-left border-b border-gray-100">
-                  <th className="py-2 font-medium">Shop</th>
-                  <th className="py-2 font-medium text-right">Tổng chi tiêu</th>
-                  <th className="py-2 font-medium text-right">Số đơn</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shopRows.map((r) => (
-                  <tr
-                    key={r.name}
-                    className="border-b border-gray-50 last:border-0"
-                  >
-                    <td className="py-2 font-medium text-[#171826]">{r.name}</td>
-                    <td className="py-2 text-right">{usd(r.spend, 2)}</td>
-                    <td className="py-2 text-right">{r.count}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-gray-200 font-bold text-[#171826]">
-                  <td className="py-2">Tổng</td>
-                  <td className="py-2 text-right">{usd(totalSpend, 2)}</td>
-                  <td className="py-2 text-right">{newOrders}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        ) : (
-          <div className="py-8 text-center text-gray-400">
-            Chưa có đơn hàng nào
-          </div>
-        )}
-      </div>
+      {/* Breakdown tài chính theo shop */}
+      <ShopFinanceTable
+        stores={financeStores}
+        orders={filtered}
+        periodKey={periodKey}
+        periodLabel={
+          PERIODS.find((p) => p.key === period)?.label || "Tháng này"
+        }
+        period={period}
+        scope={scope}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">

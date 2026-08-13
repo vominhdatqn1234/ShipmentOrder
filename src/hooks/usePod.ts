@@ -16,13 +16,15 @@ import {
   where,
 } from "lib/db";
 import { firestore } from "lib/firebase";
-import { sbSelectAll, sbUpsert, sbDeleteMany } from "lib/supabase";
+import { sbSelect, sbSelectAll, sbUpsert, sbDeleteMany } from "lib/supabase";
 import {
   BaseProduct,
   Design,
+  FinanceColumn,
   PodOrder,
   PodStore,
   PodVariant,
+  StoreFinance,
 } from "../models/pod";
 import { useUser } from "../store/useUser";
 import { usePodStore } from "../store/usePodStore";
@@ -81,6 +83,102 @@ export function useStoreMutations() {
     onSuccess: invalidate,
   });
   return { add, update, remove };
+}
+
+/* ---------- Tài chính theo shop + kỳ (bảng "Theo shop" ở Tổng quan) ---------- */
+
+/**
+ * Số liệu khách tự nhập (Doanh thu, Chi Phí Khác, các cột tự Add) của TẤT CẢ
+ * shop trong 1 kỳ. `period` là key sinh bởi financePeriodKey().
+ */
+export function useStoreFinance(period: string) {
+  const qc = useQueryClient();
+  const { user } = useUser();
+  const userId = user?.id || "";
+  const q = useQuery(
+    ["store-finance", userId, period],
+    () =>
+      sbSelect("storeFinance", {
+        filters: [
+          { column: "userId", op: "eq", value: userId },
+          { column: "period", op: "eq", value: period },
+        ],
+      }),
+    { enabled: !!userId && !!period }
+  );
+  const rows = (q.data || []) as unknown as StoreFinance[];
+
+  /** Lưu 1 ô của 1 shop — upsert theo id "<storeId>__<period>" */
+  const save = useMutation(
+    async (input: {
+      storeId: string;
+      revenue?: number;
+      otherCost?: number;
+      extras?: Record<string, number>;
+    }) => {
+      const id = `${input.storeId}__${period}`;
+      const cur = rows.find((r) => r.id === id);
+      await sbUpsert("storeFinance", [
+        {
+          id,
+          userId,
+          storeId: input.storeId,
+          period,
+          revenue: input.revenue ?? cur?.revenue ?? 0,
+          otherCost: input.otherCost ?? cur?.otherCost ?? 0,
+          extras: input.extras ?? cur?.extras ?? {},
+          updatedAt: new Date().toISOString(),
+        },
+      ]);
+    },
+    {
+      onSuccess: () => qc.invalidateQueries(["store-finance", userId, period]),
+    }
+  );
+
+  return { ...q, financeRows: rows, save };
+}
+
+/** Các cột khách tự Add vào bảng "Theo shop" (dùng chung cho mọi kỳ) */
+export function useFinanceColumns() {
+  const qc = useQueryClient();
+  const { user } = useUser();
+  const userId = user?.id || "";
+  const invalidate = () => qc.invalidateQueries(["finance-columns", userId]);
+  const q = useQuery(
+    ["finance-columns", userId],
+    () =>
+      sbSelect("financeColumns", {
+        filters: [{ column: "userId", op: "eq", value: userId }],
+        order: [{ column: "created", ascending: true }],
+      }),
+    { enabled: !!userId }
+  );
+  const columns = (q.data || []) as unknown as FinanceColumn[];
+
+  const add = useMutation(
+    async (data: { name: string; isCost: boolean }) => {
+      await sbUpsert("financeColumns", [
+        {
+          id: genId(),
+          userId,
+          name: data.name,
+          isCost: data.isCost,
+          created: new Date().toISOString(),
+        },
+      ]);
+    },
+    { onSuccess: invalidate }
+  );
+
+  const remove = useMutation(
+    async (id: string) => {
+      await sbDeleteMany("financeColumns", [id]);
+    },
+    { onSuccess: invalidate }
+  );
+
+  return { ...q, columns, add, remove };
 }
 
 /* ------- Mã màu phôi (admin cấu hình): tên màu -> hex, làm nền thiết kế ------- */

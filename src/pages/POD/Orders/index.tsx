@@ -189,17 +189,72 @@ export default function Orders() {
     }
   }, [location.state]);
 
+  // ---- Tìm kiếm nhanh: gom mọi thông tin của đơn thành 1 chuỗi để dò ----
+  // Nhiều từ khoá cách nhau bởi dấu cách = phải khớp TẤT CẢ (AND).
+  const searchIndex = useMemo(() => {
+    const m = new Map<string, string>();
+    const build = (o: any) => {
+      const items = Array.isArray(o.items) ? o.items : [];
+      return [
+        o.orderCode,
+        o.storeName,
+        o.customerName,
+        o.customerEmail,
+        o.customerPhone,
+        o.tracking,
+        o.note,
+        POD_STATUS[o.status as PodOrderStatus]?.label,
+        o.address1,
+        o.address2,
+        o.city,
+        o.state,
+        o.zip,
+        o.country,
+        o.created ? dayjs(o.created).format("DD/MM/YYYY") : "",
+        ...items.flatMap((it: any) => [
+          it?.productName,
+          it?.productSku,
+          it?.sku,
+          it?.color,
+          it?.size,
+          it?.origType,
+          it?.origColor,
+          it?.origSize,
+          it?.origTitle,
+          it?.personalization,
+          it?.note,
+          it?.transactionId,
+        ]),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+    };
+    [...orders, ...allOrders].forEach((o: any) => {
+      if (!m.has(o.id)) m.set(o.id, build(o));
+    });
+    return m;
+  }, [orders, allOrders]);
+
+  const searchTerms = useMemo(
+    () =>
+      search
+        .toLowerCase()
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter(Boolean),
+    [search]
+  );
+
   const filtered = useMemo(() => {
     // Có từ khóa -> tìm trên đơn của tất cả cửa hàng; không thì chỉ store đang chọn
     const source = search.trim() ? allOrders : orders;
     return source.filter((o) => {
       if (statusTab !== "all" && o.status !== statusTab) return false;
-      if (
-        search &&
-        !o.orderCode?.toLowerCase().includes(search.toLowerCase()) &&
-        !o.customerName?.toLowerCase().includes(search.toLowerCase())
-      )
-        return false;
+      if (searchTerms.length) {
+        const hay = searchIndex.get(o.id) || "";
+        if (!searchTerms.every((t) => hay.includes(t))) return false;
+      }
       if (fromDate && dayjs(o.created).isBefore(dayjs(fromDate), "day"))
         return false;
       if (toDate && dayjs(o.created).isAfter(dayjs(toDate), "day"))
@@ -208,7 +263,17 @@ export default function Orders() {
       if (trackFilter === "none" && (o.tracking || "").trim()) return false;
       return true;
     });
-  }, [orders, allOrders, statusTab, search, fromDate, toDate, trackFilter]);
+  }, [
+    orders,
+    allOrders,
+    statusTab,
+    search,
+    searchTerms,
+    searchIndex,
+    fromDate,
+    toDate,
+    trackFilter,
+  ]);
 
   const paged = useMemo(
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
@@ -755,14 +820,27 @@ export default function Orders() {
 
           {/* Bộ lọc */}
           <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 flex-wrap">
-            <Input
-              prefix={<FiSearch className="text-gray-400" />}
-              placeholder="Tìm đơn..."
-              className="w-[260px] h-[42px] rounded-lg"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              allowClear
-            />
+            <Tooltip
+              title={
+                <div className="text-xs">
+                  Tìm trong: mã đơn, tên/email/SĐT khách, tracking, shop, SKU
+                  &amp; tên phôi, màu, size, personalization, địa chỉ, ngày
+                  (DD/MM/YYYY), trạng thái, ghi chú.
+                  <br />
+                  Gõ nhiều từ cách nhau bởi dấu cách để lọc chồng nhau — ví dụ{" "}
+                  <b>gildan black</b>.
+                </div>
+              }
+            >
+              <Input
+                prefix={<FiSearch className="text-gray-400" />}
+                placeholder="Mã đơn, khách, tracking, SKU, màu, địa chỉ..."
+                className="w-[320px] h-[42px] rounded-lg"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                allowClear
+              />
+            </Tooltip>
             <DatePicker.RangePicker
               className="h-[42px] rounded-lg"
               format="DD/MM/YYYY"

@@ -4,12 +4,8 @@ import { useMemo, useState } from "react";
 import { FiArrowLeft, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePodOrders, useStores } from "../../../hooks/usePod";
-import {
-  POD_STATUS,
-  PodOrder,
-  PodOrderItem,
-  splitSizeFromColor,
-} from "../../../models/pod";
+import { POD_STATUS, PodOrder } from "../../../models/pod";
+import { ItemsDetail, PrintAreaCell, orderItems } from "./OrderItemsCell";
 
 type Period = "day" | "week" | "month" | "quarter" | "year";
 
@@ -86,6 +82,8 @@ export default function OverviewDetail() {
   const navigate = useNavigate();
   const period = (params.get("period") as Period) || "month";
   const scope = params.get("scope") || "shop";
+  // Lọc riêng 1 shop (mở từ bảng "Theo shop" ở Tổng quan)
+  const storeId = params.get("storeId") || "";
 
   const { orders } = usePodOrders({ allStores: scope === "all" });
   const { stores } = useStores();
@@ -121,7 +119,12 @@ export default function OverviewDetail() {
   // ----- Metric theo đơn -----
   const orderData = useMemo(() => {
     if (!orderCfg) return null;
-    const list = orders.filter((o) => inPeriod(o) && orderCfg.filter(o));
+    const list = orders.filter(
+      (o) =>
+        (!storeId || o.storeId === storeId) &&
+        inPeriod(o) &&
+        orderCfg.filter(o)
+    );
     const totalAmount = list.reduce((s, o) => s + orderCfg.amount(o), 0);
     const value =
       orderCfg.kind === "count"
@@ -178,7 +181,7 @@ export default function OverviewDetail() {
 
     return { value, groups, shops, count: list.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, metric, period]);
+  }, [orders, metric, period, storeId]);
 
   // ----- Metric theo phí shop -----
   const feeData = useMemo(() => {
@@ -205,6 +208,11 @@ export default function OverviewDetail() {
           <h1 className="text-2xl font-extrabold text-[#171826] m-0">{title}</h1>
           <p className="text-gray-500 m-0 mt-1">
             Chi tiết theo kỳ: {PERIOD_LABEL[period]}
+            {storeId
+              ? ` · Shop: ${
+                  stores.find((s) => s.id === storeId)?.name || storeId
+                }`
+              : ""}
           </p>
         </div>
       </div>
@@ -321,14 +329,21 @@ export default function OverviewDetail() {
                       }}
                     />
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm border-collapse min-w-[560px]">
+                      <table className="w-full text-sm border-collapse min-w-[980px]">
                         <thead>
-                          <tr className="text-gray-500 text-left border-b border-gray-100">
-                            <th className="py-2 font-medium">Mã đơn</th>
-                            <th className="py-2 font-medium">Ngày tạo</th>
-                            <th className="py-2 font-medium">Trạng thái</th>
-                            <th className="py-2 font-medium text-right">
-                              {orderCfg.amountLabel}
+                          <tr className="text-[11px] tracking-wider text-gray-500 text-left border-b border-gray-100 bg-gray-50/60">
+                            <th className="py-2 px-2 font-medium">MÃ ĐƠN</th>
+                            <th className="py-2 px-2 font-medium min-w-[280px]">
+                              CHI TIẾT SẢN PHẨM &amp; THIẾT KẾ
+                            </th>
+                            <th className="py-2 px-2 font-medium">VÙNG IN</th>
+                            <th className="py-2 px-2 font-medium">TRẠNG THÁI</th>
+                            <th className="py-2 px-2 font-medium whitespace-nowrap">
+                              NGÀY KHÁCH LÊN ĐƠN
+                            </th>
+                            <th className="py-2 px-2 font-medium">TRACKING</th>
+                            <th className="py-2 px-2 font-medium text-right whitespace-nowrap">
+                              {orderCfg.amountLabel.toUpperCase()}
                             </th>
                           </tr>
                         </thead>
@@ -337,19 +352,28 @@ export default function OverviewDetail() {
                             <tr
                               key={o.id}
                               onClick={() => setDetailOrder(o)}
-                              className="border-b border-gray-50 last:border-0 cursor-pointer hover:bg-[#F8FAFC]"
+                              className="border-b border-gray-50 last:border-0 cursor-pointer hover:bg-[#F8FAFC] align-top"
                             >
-                              <td className="py-2 font-medium text-[#2563EB] underline">
-                                {o.orderCode}
+                              <td className="py-2 px-2">
+                                <div className="font-bold text-[#2563EB] underline whitespace-nowrap">
+                                  {o.orderCode}
+                                </div>
+                                <div className="text-[11px] text-gray-500 mt-0.5">
+                                  Khách: {o.customerName || "—"}
+                                </div>
                               </td>
-                              <td className="py-2 text-gray-500">
-                                {o.created
-                                  ? dayjs(o.created).format("DD/MM/YYYY")
-                                  : "—"}
+                              <td
+                                className="py-2 px-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ItemsDetail order={o} compact />
                               </td>
-                              <td className="py-2">
+                              <td className="py-2 px-2">
+                                <PrintAreaCell order={o} />
+                              </td>
+                              <td className="py-2 px-2">
                                 <span
-                                  className="inline-block rounded px-2 py-0.5 text-xs font-semibold"
+                                  className="inline-block rounded px-2 py-0.5 text-xs font-semibold whitespace-nowrap"
                                   style={{
                                     color:
                                       POD_STATUS[o.status]?.color || "#6B7280",
@@ -360,7 +384,28 @@ export default function OverviewDetail() {
                                   {POD_STATUS[o.status]?.label || o.status}
                                 </span>
                               </td>
-                              <td className="py-2 text-right font-medium">
+                              <td className="py-2 px-2 text-gray-500 whitespace-nowrap">
+                                {o.created
+                                  ? dayjs(o.created).format("DD/MM/YYYY")
+                                  : "—"}
+                                {o.datePaid && (
+                                  <div className="text-[11px] text-gray-400">
+                                    TT: {dayjs(o.datePaid).format("DD/MM/YYYY")}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-2 px-2">
+                                {o.tracking ? (
+                                  <span className="text-[#2563EB] break-all">
+                                    {o.tracking}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 italic whitespace-nowrap">
+                                    Chưa có
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-right font-medium whitespace-nowrap">
                                 {usd(orderCfg.amount(o))}
                               </td>
                             </tr>
@@ -532,55 +577,52 @@ export default function OverviewDetail() {
               </div>
             </div>
 
-            {/* Sản phẩm */}
-            <div>
-              <div className="text-gray-400 text-xs font-medium mb-1">
-                SẢN PHẨM
+            {/* Sản phẩm & thiết kế */}
+            <div className="grid grid-cols-[1fr_auto] gap-4">
+              <div>
+                <div className="text-gray-400 text-xs font-medium mb-1">
+                  CHI TIẾT SẢN PHẨM &amp; THIẾT KẾ
+                </div>
+                <ItemsDetail order={detailOrder} />
               </div>
-              <div className="space-y-2">
-                {(detailOrder.items || []).map((it, i) => (
-                  <div
-                    key={i}
-                    className="border border-gray-100 rounded-lg p-3 text-sm"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="bg-amber-50 border border-amber-200 text-amber-700 rounded px-2 py-0.5 text-xs font-semibold">
-                        {origLabel(it) || "—"}
-                      </span>
-                      <span className="text-gray-500">
-                        {it.quantity || 1}x {it.productSku || "—"}
-                        {[it.color, it.size].filter(Boolean).length
-                          ? ` (${[it.color, it.size].filter(Boolean).join(" - ")})`
-                          : ""}
-                      </span>
-                    </div>
-                    {(it.frontUrl || it.backUrl || it.mockupUrl) && (
-                      <div className="mt-1 text-[11px] text-gray-400 break-all">
-                        {[
-                          it.frontUrl && `FRONT: ${it.frontUrl}`,
-                          it.backUrl && `BACK: ${it.backUrl}`,
-                          it.mockupUrl && `MOCKUP: ${it.mockupUrl}`,
-                        ]
-                          .filter(Boolean)
-                          .map((line, k) => (
-                            <div key={k}>{line}</div>
-                          ))}
-                      </div>
-                    )}
-                    {it.personalization && (
-                      <div className="mt-1 text-xs text-gray-500">
-                        Personalization: {it.personalization}
-                      </div>
-                    )}
-                    {it.note && (
-                      <div className="mt-1 text-xs text-gray-500">
-                        Ghi chú: {it.note}
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div>
+                <div className="text-gray-400 text-xs font-medium mb-1">
+                  VÙNG IN
+                </div>
+                <PrintAreaCell order={detailOrder} />
               </div>
             </div>
+
+            {/* Link file thiết kế (copy nhanh) */}
+            {orderItems(detailOrder).some(
+              (it) => it.frontUrl || it.backUrl || it.mockupUrl
+            ) && (
+              <div>
+                <div className="text-gray-400 text-xs font-medium mb-1">
+                  LINK FILE THIẾT KẾ
+                </div>
+                <div className="text-[11px] text-gray-500 break-all space-y-0.5">
+                  {orderItems(detailOrder).map((it, i) => (
+                    <div key={i}>
+                      {[
+                        it.frontUrl && `FRONT: ${it.frontUrl}`,
+                        it.backUrl && `BACK: ${it.backUrl}`,
+                        it.mockupUrl && `MOCKUP: ${it.mockupUrl}`,
+                        ...(Array.isArray(it.extraAreas) ? it.extraAreas : []).map(
+                          (e) =>
+                            e?.url &&
+                            `${String(e?.name || "EXTRA").toUpperCase()}: ${e.url}`
+                        ),
+                      ]
+                        .filter(Boolean)
+                        .map((line, k) => (
+                          <div key={k}>{line}</div>
+                        ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {detailOrder.note && (
               <div className="text-sm">
@@ -596,20 +638,4 @@ export default function OverviewDetail() {
       </Modal>
     </div>
   );
-}
-
-/** Bản gốc khách up: Type · Color · Size (tách size nếu dính trong color) */
-function origLabel(it: PodOrderItem): string {
-  const type = it.origType ?? it.productSku ?? "";
-  const { color, size } = splitSizeFromColor(
-    it.origColor ?? it.color,
-    it.origSize ?? it.size
-  );
-  return [
-    type && `Type: ${type}`,
-    color && `Color: ${color}`,
-    size && `Size: ${size}`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 }

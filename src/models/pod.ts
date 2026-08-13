@@ -53,6 +53,45 @@ export interface PodStore {
   discountAmount?: number; // Mức chiết khấu ($)
 }
 
+/**
+ * Số liệu tài chính khách TỰ NHẬP cho 1 shop trong 1 kỳ (bảng "Theo shop").
+ * Các cột còn lại được tính tự động từ đơn hàng / phí admin nhập.
+ */
+export interface StoreFinance {
+  id: string; // "<storeId>__<period>"
+  userId?: string;
+  storeId: string;
+  period: string; // 2026-08-13 | 2026-W33 | 2026-08 | 2026-Q3 | 2026
+  revenue?: number; // Doanh thu (khách nhập)
+  otherCost?: number; // Chi Phí Khác (khách nhập)
+  extras?: Record<string, number>; // { [financeColumnId]: số tiền }
+  updatedAt?: string;
+}
+
+/** Cột do khách tự Add vào bảng "Theo shop" (vd Lương) */
+export interface FinanceColumn {
+  id: string;
+  userId?: string;
+  name: string;
+  /** true = chi phí (trừ vào lợi nhuận), false = thu (cộng vào lợi nhuận) */
+  isCost: boolean;
+  created?: string;
+}
+
+/** Sinh key kỳ để lưu số liệu tài chính theo từng kỳ đang chọn trên Overview */
+export function financePeriodKey(
+  period: "day" | "week" | "month" | "quarter" | "year",
+  d: any // dayjs.Dayjs — mốc thời gian của kỳ
+): string {
+  if (period === "day") return d.format("YYYY-MM-DD");
+  // Không dùng plugin weekOfYear: lấy ngày đầu tuần làm khoá
+  if (period === "week") return `W${d.startOf("week").format("YYYY-MM-DD")}`;
+  if (period === "month") return d.format("YYYY-MM");
+  if (period === "quarter")
+    return `${d.year()}-Q${Math.floor(d.month() / 3) + 1}`;
+  return d.format("YYYY");
+}
+
 export interface BaseProduct {
   id: string;
   name: string;
