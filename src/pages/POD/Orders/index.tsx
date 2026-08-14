@@ -54,11 +54,27 @@ import { useAccountGuard } from "../../../hooks/useAccountGuard";
 import {
   PodOrderItem,
   SPECIAL_PRINT_AREA_FEE,
+  FULL_PRINT_LABEL,
   SPECIAL_PRINT_AREA_LABEL,
   podItemTotal,
 } from "../../../models/pod";
 
 type ViewTab = "list" | "import" | "create";
+
+/** Hướng dẫn kích thước file in — hover vào dấu ✳ ở cột VÙNG IN để xem */
+const PRINT_AREA_GUIDE = (
+  <div className="text-xs leading-6">
+    <div>
+      <b>Mặc định</b> 4500*5400 hoặc 4500*5100
+    </div>
+    <div>
+      <b>Hoodie</b> 4500*3000 cho mặt trước
+    </div>
+    <div className="mt-1 font-bold">Vùng in lớn</div>
+    <div>4800*6300px cho S-L</div>
+    <div>6000*7500px cho XL-5XL</div>
+  </div>
+);
 
 function StatusBadge({ status }: { status: PodOrderStatus }) {
   const st = POD_STATUS[status] || POD_STATUS.pending_payment;
@@ -1030,7 +1046,16 @@ export default function Orders() {
                   </th>
                   <th className="p-3">MÃ ĐƠN</th>
                   <th className="p-3">CHI TIẾT SẢN PHẨM & THIẾT KẾ</th>
-                  <th className="p-3">VÙNG IN</th>
+                  <th className="p-3">
+                    <span className="inline-flex items-center gap-1">
+                      VÙNG IN
+                      <Tooltip title={PRINT_AREA_GUIDE} placement="bottom">
+                        <span className="text-[#DC2626] font-bold cursor-help text-[13px] leading-none">
+                          ✳
+                        </span>
+                      </Tooltip>
+                    </span>
+                  </th>
                   <th className="p-3">TRẠNG THÁI</th>
                   <th className="p-3">NGÀY LÊN ĐƠN</th>
                   <th className="p-3">TRACKING</th>
@@ -1124,7 +1149,7 @@ export default function Orders() {
                             <Select
                               size="small"
                               className="w-[150px]"
-                              value={it.printArea === "special" ? "special" : ""}
+                              value={it.printArea || ""}
                               onChange={(v) =>
                                 patchOrderItem(o, idx, { printArea: v })
                               }
@@ -1132,13 +1157,13 @@ export default function Orders() {
                                 { value: "", label: "Mặc định" },
                                 {
                                   value: "special",
-                                  label: `${SPECIAL_PRINT_AREA_LABEL} (+$${specialFee(
-                                    it
-                                  )})`,
+                                  label: SPECIAL_PRINT_AREA_LABEL,
                                 },
+                                { value: "full", label: FULL_PRINT_LABEL },
                               ]}
                             />
-                            {it.printArea === "special" && (
+                            {(it.printArea === "special" ||
+                              it.printArea === "full") && (
                               <div className="text-orange-600 text-[11px] font-bold mt-0.5">
                                 +${(specialFee(it) * (it.quantity || 1)).toFixed(2)}
                               </div>

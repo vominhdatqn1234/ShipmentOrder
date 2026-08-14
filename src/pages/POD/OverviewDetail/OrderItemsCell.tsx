@@ -3,7 +3,7 @@ import { useState } from "react";
 import {
   PodOrder,
   PodOrderItem,
-  SPECIAL_PRINT_AREA_LABEL,
+  printAreaLabel,
   splitSizeFromColor,
 } from "../../../models/pod";
 import { imageUrlCandidates } from "../../../utils/imageUrl";
@@ -193,9 +193,9 @@ export function PrintAreaCell({ order }: { order: PodOrder }) {
               SP{idx + 1}
             </div>
           )}
-          {it.printArea === "special" ? (
+          {it.printArea === "special" || it.printArea === "full" ? (
             <span className="inline-block rounded px-2 py-0.5 text-[11px] font-semibold bg-[#FFF1E7] text-[#C2410C] whitespace-nowrap">
-              {SPECIAL_PRINT_AREA_LABEL}
+              {printAreaLabel(it.printArea)}
             </span>
           ) : (
             <span className="inline-block rounded px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-500">

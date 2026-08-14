@@ -126,6 +126,15 @@ export interface Design {
 /** Phụ phí vùng in đặc biệt ($/sản phẩm) — fallback khi chưa có bảng giá phôi */
 export const SPECIAL_PRINT_AREA_FEE = 2;
 export const SPECIAL_PRINT_AREA_LABEL = "Vùng in đặc biệt";
+/** In Full — dùng chung mức phụ phí với vùng in đặc biệt */
+export const FULL_PRINT_LABEL = "In Full";
+
+/** Nhãn hiển thị của vùng in */
+export function printAreaLabel(area?: string): string {
+  if (area === "special") return SPECIAL_PRINT_AREA_LABEL;
+  if (area === "full") return FULL_PRINT_LABEL;
+  return "Mặc định";
+}
 
 /**
  * Tổng tiền 1 item = đơn giá × SL.
@@ -217,7 +226,7 @@ export function findVariant(
  * Đơn giá 1 item theo bảng giá phôi POD:
  * - Chỉ in 1 mặt (không có link BACK/MOCKUP) → Giá Teement.
  * - Có link BACK hoặc MOCKUP (in 2 mặt) → Giá + Giá ship + In 1 mặt.
- * - Có vùng in đặc biệt (printArea === "special") → cộng thêm In vùng phụ.
+ * - Vùng in đặc biệt / In Full → cộng thêm In vùng phụ (cùng mức phí).
  * Không tìm được biến thể → giữ nguyên giá hiện tại của item (không ghi đè).
  */
 export function variantUnitPrice(
@@ -235,9 +244,11 @@ export function variantUnitPrice(
   let price = twoSide
     ? (v.price || 0) + (v.shipPrice || 0) + (v.printOneSide || 0)
     : v.priceTeement || 0;
-  // Có vùng in đặc biệt (bảng inline) hoặc có vùng in phụ (form đơn) → + In vùng phụ
+  // Vùng in đặc biệt / In Full / có vùng in phụ (form đơn) → + In vùng phụ
   const hasExtra =
-    item.printArea === "special" || (item.extraAreas?.length || 0) > 0;
+    item.printArea === "special" ||
+    item.printArea === "full" ||
+    (item.extraAreas?.length || 0) > 0;
   if (hasExtra) price += v.printExtraArea || 0;
   return price;
 }
