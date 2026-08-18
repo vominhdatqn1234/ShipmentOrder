@@ -225,21 +225,27 @@ export function useBaseProducts() {
 
 /* ------- Designs (thư viện SKU — riêng theo user và từng cửa hàng) ------- */
 
-export function useDesigns() {
+/**
+ * Thư viện thiết kế. Mặc định chỉ lấy SKU của cửa hàng đang chọn.
+ * Truyền { allStores: true } để lấy thiết kế của TẤT CẢ cửa hàng
+ * (trang "Thiết kế của tôi" dùng để lọc / tìm kiếm xuyên shop).
+ */
+export function useDesigns(opts?: { allStores?: boolean }) {
   const { user } = useUser();
   const { selectedStoreId } = usePodStore();
   const userId = user?.id || "";
+  const allStores = !!opts?.allStores;
   const q = useQuery(
-    ["pod-designs", userId, selectedStoreId],
+    ["pod-designs", userId, allStores ? "all" : selectedStoreId],
     () =>
       getDocs(
         query(
           designsRef,
           where("userId", "==", userId),
-          where("storeId", "==", selectedStoreId)
+          ...(allStores ? [] : [where("storeId", "==", selectedStoreId)])
         )
       ),
-    { enabled: !!userId && !!selectedStoreId }
+    { enabled: !!userId && (allStores || !!selectedStoreId) }
   );
   // Sort ổn định (mới nhất trước) — tránh UPDATE làm đảo thứ tự hàng trên bảng
   const designs = snapshotToList<Design>(q.data).sort((a, b) => {
@@ -254,12 +260,14 @@ export function useDesignMutations() {
   const { user } = useUser();
   const { selectedStoreId } = usePodStore();
   const invalidate = () => qc.invalidateQueries(["pod-designs"]);
+  // storeId có thể truyền kèm data (chọn shop ngay trong form thêm thiết kế);
+  // không truyền thì mặc định là cửa hàng đang chọn ở sidebar.
   const add = useMutation(
-    (data: Partial<Design>) =>
+    ({ storeId, ...data }: Partial<Design>) =>
       addDoc(designsRef, {
         ...data,
         userId: user?.id || "",
-        storeId: selectedStoreId,
+        storeId: storeId || selectedStoreId,
       }),
     { onSuccess: invalidate }
   );

@@ -6,11 +6,19 @@ import {
   Pagination,
   Popconfirm,
   Popover,
+  Select,
   Tooltip,
   message,
 } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiSearch, FiPlus, FiEdit3, FiTrash2, FiImage } from "react-icons/fi";
+import {
+  FiSearch,
+  FiPlus,
+  FiEdit3,
+  FiTrash2,
+  FiImage,
+  FiShoppingBag,
+} from "react-icons/fi";
 import {
   useDesignMutations,
   useDesigns,
@@ -238,10 +246,56 @@ function Field({
   );
 }
 
+/** Ô chọn cửa hàng trong form (cùng style với <Field/>) */
+function StoreField({
+  value,
+  options,
+  onChange,
+  disabled,
+  disabledText,
+}: {
+  value: string;
+  options: { id: string; name: string; status?: string }[];
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  disabledText?: string;
+}) {
+  return (
+    <div>
+      <div className="text-[11px] font-bold tracking-widest text-gray-400 mb-2">
+        CỬA HÀNG (SHOP) *
+      </div>
+      {disabled ? (
+        <div className="h-[52px] rounded-xl border-2 border-gray-200 bg-gray-100 text-gray-500 px-4 flex items-center text-[15px]">
+          {disabledText || "—"}
+        </div>
+      ) : (
+        <Select
+          className="w-full pod-store-select"
+          size="large"
+          value={value || undefined}
+          placeholder="Chọn cửa hàng lưu thiết kế"
+          onChange={onChange}
+          showSearch
+          optionFilterProp="label"
+          options={options.map((s) => ({
+            value: s.id,
+            label: s.name + (s.status === "locked" ? " (đang khóa)" : ""),
+            disabled: s.status === "locked",
+          }))}
+        />
+      )}
+    </div>
+  );
+}
+
 function DesignFormModal({
   open,
   initial,
   focusAreas,
+  stores,
+  defaultStoreId,
+  storeName,
   onClose,
   onSave,
   saving,
@@ -249,9 +303,13 @@ function DesignFormModal({
   open: boolean;
   initial?: Design | null;
   focusAreas?: boolean;
+  stores: { id: string; name: string; status?: string }[];
+  defaultStoreId: string;
+  storeName?: string;
   onClose: () => void;
   onSave: (data: {
     sku: string;
+    storeId: string;
     frontUrl: string;
     backUrl: string;
     mockupUrl: string;
@@ -261,6 +319,7 @@ function DesignFormModal({
 }) {
   const isEdit = !!initial;
   const [sku, setSku] = useState("");
+  const [storeId, setStoreId] = useState("");
   const [frontUrl, setFrontUrl] = useState("");
   const [backUrl, setBackUrl] = useState("");
   const [mockupUrl, setMockupUrl] = useState("");
@@ -271,6 +330,7 @@ function DesignFormModal({
   useEffect(() => {
     if (!open) return;
     setSku(initial?.sku || "");
+    setStoreId(initial?.storeId || defaultStoreId || "");
     setFrontUrl(initial?.frontUrl || "");
     setBackUrl(initial?.backUrl || "");
     setMockupUrl(initial?.mockupUrl || "");
@@ -286,10 +346,11 @@ function DesignFormModal({
       }, 250);
       setTimeout(() => setHighlightAreas(false), 2500);
     }
-  }, [open, initial, focusAreas]);
+  }, [open, initial, focusAreas, defaultStoreId]);
 
   const reset = () => {
     setSku("");
+    setStoreId("");
     setFrontUrl("");
     setBackUrl("");
     setMockupUrl("");
@@ -330,8 +391,13 @@ function DesignFormModal({
                 message.error("Vui lòng nhập mã định danh (Design SKU)");
                 return;
               }
+              if (!isEdit && !storeId) {
+                message.error("Vui lòng chọn cửa hàng cho thiết kế này");
+                return;
+              }
               onSave({
                 sku: sku.trim(),
+                storeId,
                 frontUrl: frontUrl.trim(),
                 backUrl: backUrl.trim(),
                 mockupUrl: mockupUrl.trim(),
@@ -347,6 +413,13 @@ function DesignFormModal({
       }
     >
       <div className="space-y-5 pt-2 max-h-[62vh] overflow-y-auto pr-1">
+        <StoreField
+          value={storeId}
+          options={stores}
+          onChange={setStoreId}
+          disabled={isEdit}
+          disabledText={storeName || "Không xác định"}
+        />
         <Field
           label="MÃ ĐỊNH DANH (DESIGN SKU)"
           required
@@ -491,8 +564,12 @@ function DesignFormModal({
   );
 }
 
+/** Giá trị bộ lọc "tất cả cửa hàng" */
+const ALL_SHOPS = "__all__";
+
 export default function Designs() {
-  const { designs } = useDesigns();
+  // Lấy thiết kế của TẤT CẢ cửa hàng để có thể lọc / tìm kiếm xuyên shop
+  const { designs } = useDesigns({ allStores: true });
   const { add, update, remove, removeMany } = useDesignMutations();
   const { selectedStoreId } = usePodStore();
   const { stores } = useStores();
@@ -503,7 +580,13 @@ export default function Designs() {
   const storeBlockMsg = !selectedStoreId
     ? "Bạn cần tạo cửa hàng trước khi thêm thiết kế"
     : "Cửa hàng đang bị khóa — không thể thêm thiết kế. Vui lòng liên hệ admin.";
+  // Được phép thêm thiết kế nếu còn ít nhất 1 cửa hàng chưa bị khóa
+  const canAdd = stores.some((s) => s.status !== "locked");
+  const addBlockMsg = !stores.length
+    ? "Bạn cần tạo cửa hàng trước khi thêm thiết kế"
+    : "Tất cả cửa hàng đang bị khóa — không thể thêm thiết kế. Vui lòng liên hệ admin.";
   const [search, setSearch] = useState("");
+  const [shopFilter, setShopFilter] = useState<string>(selectedStoreId || ALL_SHOPS);
   const [detail, setDetail] = useState<Design | null>(null);
   const [focusAreas, setFocusAreas] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -512,13 +595,48 @@ export default function Designs() {
   const [pageSize, setPageSize] = useState(10);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const list = useMemo(
-    () =>
-      designs.filter(
-        (d) => !search || d.sku.toLowerCase().includes(search.toLowerCase())
-      ),
-    [designs, search]
-  );
+  // Tên shop theo id (dùng cho cột "Cửa hàng" + tìm kiếm theo tên shop)
+  const storeNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    stores.forEach((s) => (map[s.id] = s.name));
+    return map;
+  }, [stores]);
+  const shopNameOf = (d: Design) =>
+    storeNameById[d.storeId || ""] || (d.storeId ? "Shop đã xóa" : "Chưa gán shop");
+
+  // Đổi shop ở sidebar -> bộ lọc bám theo shop đó (trừ khi đang xem "tất cả")
+  useEffect(() => {
+    setShopFilter((prev) =>
+      prev === ALL_SHOPS ? prev : selectedStoreId || ALL_SHOPS
+    );
+  }, [selectedStoreId]);
+
+  const list = useMemo(() => {
+    const kw = search.trim().toLowerCase();
+    return designs.filter((d) => {
+      if (shopFilter !== ALL_SHOPS && (d.storeId || "") !== shopFilter)
+        return false;
+      if (!kw) return true;
+      // Tìm theo mã SKU hoặc theo tên cửa hàng
+      return (
+        d.sku.toLowerCase().includes(kw) ||
+        shopNameOf(d).toLowerCase().includes(kw)
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [designs, search, shopFilter, storeNameById]);
+
+  // Số kết quả nếu tìm trên toàn bộ shop (gợi ý mở rộng phạm vi tìm kiếm)
+  const globalMatchCount = useMemo(() => {
+    const kw = search.trim().toLowerCase();
+    if (!kw) return 0;
+    return designs.filter(
+      (d) =>
+        d.sku.toLowerCase().includes(kw) ||
+        shopNameOf(d).toLowerCase().includes(kw)
+    ).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [designs, search, storeNameById]);
 
   // Trang hiện tại
   const paged = useMemo(
@@ -529,12 +647,22 @@ export default function Designs() {
   // Reset trang khi tìm kiếm/đổi store; bỏ selection không còn tồn tại
   useEffect(() => {
     setPage(1);
-  }, [search, selectedStoreId]);
+  }, [search, shopFilter, selectedStoreId]);
   useEffect(() => {
     setSelectedIds((prev) =>
       prev.filter((id) => designs.some((d) => d.id === id))
     );
   }, [designs]);
+
+  // Shop mặc định khi mở form thêm mới: shop đang lọc (nếu không bị khóa),
+  // ngược lại lấy shop đang chọn ở sidebar.
+  const defaultFormStoreId = useMemo(() => {
+    const filtered = stores.find((s) => s.id === shopFilter);
+    if (filtered && filtered.status !== "locked") return filtered.id;
+    return selectedStore && selectedStore.status !== "locked"
+      ? selectedStore.id
+      : "";
+  }, [stores, shopFilter, selectedStore]);
 
   const pageIds = paged.map((d) => d.id);
   const allPageSelected =
@@ -602,6 +730,7 @@ export default function Designs() {
 
   const handleSave = async (data: {
     sku: string;
+    storeId: string;
     frontUrl: string;
     backUrl: string;
     mockupUrl: string;
@@ -621,8 +750,15 @@ export default function Designs() {
       setFocusAreas(false);
       return;
     }
-    if (designs.some((d) => d.sku.toLowerCase() === data.sku.toLowerCase())) {
-      message.error("Mã SKU này đã tồn tại trong thư viện");
+    // SKU chỉ cần duy nhất TRONG cùng 1 cửa hàng
+    if (
+      designs.some(
+        (d) =>
+          (d.storeId || "") === data.storeId &&
+          d.sku.toLowerCase() === data.sku.toLowerCase()
+      )
+    ) {
+      message.error("Mã SKU này đã tồn tại trong cửa hàng đã chọn");
       return;
     }
     await add.mutateAsync({
@@ -630,7 +766,11 @@ export default function Designs() {
       testBg: "#FFFFFF",
       created: new Date().toISOString(),
     } as any);
-    message.success("Đã thêm thiết kế gốc mới");
+    message.success(
+      `Đã thêm thiết kế gốc mới vào shop ${
+        storeNameById[data.storeId] || ""
+      }`.trim()
+    );
     setAddOpen(false);
   };
 
@@ -644,7 +784,10 @@ export default function Designs() {
     for (const r of rows) {
       const sku = r["SKU"] || r["sku"];
       if (!sku) continue;
-      const existing = designs.find((d) => d.sku === sku);
+      // Import luôn vào cửa hàng đang chọn ở sidebar
+      const existing = designs.find(
+        (d) => d.sku === sku && (d.storeId || "") === selectedStoreId
+      );
       const data = {
         sku,
         frontUrl: r["Front"] || r["frontUrl"] || "",
@@ -655,21 +798,31 @@ export default function Designs() {
       else
         await add.mutateAsync({
           ...data,
+          storeId: selectedStoreId,
           extraAreas: [],
           testBg: "#FFFFFF",
           created: new Date().toISOString(),
         } as any);
       count++;
     }
-    message.success(`Đã nhập ${count} SKU từ CSV`);
+    message.success(
+      `Đã nhập ${count} SKU từ CSV vào shop ${selectedStore?.name || ""}`.trim()
+    );
   };
 
+  // Xuất đúng những gì đang hiển thị (theo bộ lọc shop + từ khóa tìm kiếm)
   const handleExport = () => {
     downloadCSV(
       "designs.csv",
       toCSV(
-        ["SKU", "Front", "Back", "Mockup"],
-        designs.map((d) => [d.sku, d.frontUrl, d.backUrl, d.mockupUrl])
+        ["Shop", "SKU", "Front", "Back", "Mockup"],
+        list.map((d) => [
+          shopNameOf(d),
+          d.sku,
+          d.frontUrl,
+          d.backUrl,
+          d.mockupUrl,
+        ])
       )
     );
   };
@@ -681,19 +834,39 @@ export default function Designs() {
           <h1 className="text-2xl font-extrabold text-[#171826] m-0 flex items-center gap-3">
             Thư viện Thiết kế & SKU
             <span className="text-xs font-bold bg-[#FBF6EC] text-[#B79351] border border-[#EADFC8] rounded-full px-2.5 py-1">
-              {designs.length} SKU
+              {list.length}
+              {list.length !== designs.length ? `/${designs.length}` : ""} SKU
             </span>
           </h1>
           <p className="text-gray-500 m-0 mt-1 max-w-md">
-            Quản lý kho tài nguyên in ấn. Có thể chỉnh sửa nhanh link ảnh trực
-            tiếp trên bảng.
+            Quản lý kho tài nguyên in ấn của tất cả cửa hàng. Có thể chỉnh sửa
+            nhanh link ảnh trực tiếp trên bảng.
           </p>
         </div>
         <div className="flex flex-col items-stretch sm:items-end gap-2 w-full sm:w-auto">
           <div className="flex gap-2 flex-wrap">
+            <Select
+              className="w-full sm:w-[210px]"
+              value={shopFilter}
+              onChange={setShopFilter}
+              showSearch
+              optionFilterProp="label"
+              options={[
+                {
+                  value: ALL_SHOPS,
+                  label: `Tất cả cửa hàng (${designs.length})`,
+                },
+                ...stores.map((s) => ({
+                  value: s.id,
+                  label: `${s.name} (${
+                    designs.filter((d) => (d.storeId || "") === s.id).length
+                  })`,
+                })),
+              ]}
+            />
             <Input
               prefix={<FiSearch className="text-gray-400" />}
-              placeholder="Tìm theo mã SKU..."
+              placeholder="Tìm mã SKU / tên shop..."
               className="w-full sm:w-[220px] rounded-lg"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -718,15 +891,15 @@ export default function Designs() {
               }}
             />
           </div>
-          <Tooltip title={hasStore ? "" : storeBlockMsg}>
+          <Tooltip title={canAdd ? "" : addBlockMsg}>
             <Button
               type="primary"
-              className={hasStore ? "bg-[#171826]" : ""}
+              className={canAdd ? "bg-[#171826]" : ""}
               icon={<FiPlus />}
-              disabled={!hasStore}
+              disabled={!canAdd}
               onClick={() => {
-                if (!hasStore) {
-                  message.warning(storeBlockMsg);
+                if (!canAdd) {
+                  message.warning(addBlockMsg);
                   return;
                 }
                 setAddOpen(true);
@@ -735,6 +908,18 @@ export default function Designs() {
               Thêm Mới Gốc
             </Button>
           </Tooltip>
+          {/* Gợi ý mở rộng tìm kiếm ra toàn bộ cửa hàng */}
+          {search.trim() &&
+            shopFilter !== ALL_SHOPS &&
+            globalMatchCount > list.length && (
+              <button
+                onClick={() => setShopFilter(ALL_SHOPS)}
+                className="text-xs text-[#B79351] bg-transparent border-0 cursor-pointer p-0 text-left sm:text-right"
+              >
+                Có <b>{globalMatchCount}</b> kết quả ở tất cả cửa hàng — bấm để
+                tìm trên toàn bộ shop
+              </button>
+            )}
         </div>
       </div>
 
@@ -755,6 +940,7 @@ export default function Designs() {
                   onChange={(e) => togglePage(e.target.checked)}
                 />
               </th>
+              <th className="p-4">CỬA HÀNG (SHOP)</th>
               <th className="p-4">MÃ ĐỊNH DANH (SKU)</th>
               <th className="p-4">MẶT TRƯỚC (FRONT)</th>
               <th className="p-4">MẶT SAU (BACK)</th>
@@ -778,6 +964,27 @@ export default function Designs() {
                     checked={selectedIds.includes(d.id)}
                     onChange={(e) => toggleOne(d.id, e.target.checked)}
                   />
+                </td>
+                <td className="p-4">
+                  <Tooltip
+                    title={
+                      <span>
+                        {shopNameOf(d)}
+                        <br />
+                        <span className="text-[11px] opacity-70">
+                          Bấm để lọc theo cửa hàng này
+                        </span>
+                      </span>
+                    }
+                  >
+                    <button
+                      onClick={() => setShopFilter(d.storeId || "")}
+                      className="inline-flex items-center gap-1.5 max-w-[160px] text-xs font-bold text-[#B79351] bg-[#FBF6EC] border border-[#EADFC8] rounded-full px-2.5 py-1 cursor-pointer hover:bg-[#F5EBD8] transition-colors"
+                    >
+                      <FiShoppingBag size={12} className="shrink-0" />
+                      <span className="truncate">{shopNameOf(d)}</span>
+                    </button>
+                  </Tooltip>
                 </td>
                 <td className="p-4">
                   <div className="font-extrabold text-[#171826] text-lg">
@@ -899,8 +1106,10 @@ export default function Designs() {
             ))}
             {!list.length && (
               <tr>
-                <td colSpan={7} className="p-16 text-center text-gray-400">
-                  {hasStore
+                <td colSpan={8} className="p-16 text-center text-gray-400">
+                  {search.trim()
+                    ? "Không tìm thấy SKU nào khớp với từ khóa"
+                    : hasStore
                     ? 'Chưa có SKU nào — bấm "Thêm Mới Gốc" để bắt đầu'
                     : "Bạn chưa có cửa hàng — vào Quản lý Cửa hàng để kết nối store trước, sau đó mới thêm được thiết kế"}
                 </td>
@@ -933,6 +1142,15 @@ export default function Designs() {
                     {d.sku}
                   </div>
                 </div>
+                <Tooltip title={shopNameOf(d)}>
+                  <button
+                    onClick={() => setShopFilter(d.storeId || "")}
+                    className="mt-2 inline-flex items-center gap-1.5 max-w-[190px] text-xs font-bold text-[#B79351] bg-[#FBF6EC] border border-[#EADFC8] rounded-full px-2.5 py-1 cursor-pointer"
+                  >
+                    <FiShoppingBag size={12} className="shrink-0" />
+                    <span className="truncate">{shopNameOf(d)}</span>
+                  </button>
+                </Tooltip>
                 <div className="text-[10px] tracking-widest text-gray-400 mt-2 mb-1">
                   NỀN ƯỚM THỬ
                 </div>
@@ -1017,7 +1235,9 @@ export default function Designs() {
         ))}
         {!list.length && (
           <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-gray-400">
-            {hasStore
+            {search.trim()
+              ? "Không tìm thấy SKU nào khớp với từ khóa"
+              : hasStore
               ? 'Chưa có SKU nào — bấm "Thêm Mới Gốc" để bắt đầu'
               : "Bạn chưa có cửa hàng — vào Quản lý Cửa hàng để kết nối store trước"}
           </div>
@@ -1033,6 +1253,9 @@ export default function Designs() {
         open={addOpen || !!detail}
         initial={detail}
         focusAreas={focusAreas}
+        stores={stores}
+        defaultStoreId={defaultFormStoreId}
+        storeName={detail ? shopNameOf(detail) : ""}
         saving={add.isLoading || update.isLoading}
         onClose={() => {
           setAddOpen(false);
