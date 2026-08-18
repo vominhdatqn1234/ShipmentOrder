@@ -23,6 +23,7 @@ import {
   FiPlus,
   FiRotateCcw,
   FiSearch,
+  FiShoppingBag,
   FiTrash2,
   FiTruck,
 } from "react-icons/fi";
@@ -50,6 +51,7 @@ import { downloadCSV, parseCSV, parseVariations, toCSV } from "../../../utils/cs
 import { parseEtsyPackingSlipPdf } from "../../../utils/pdfPod";
 import OrderItemEditor from "./OrderItemEditor";
 import OrderModal from "./OrderModal";
+import SheetImportModal from "./SheetImportModal";
 import { useAccountGuard } from "../../../hooks/useAccountGuard";
 import {
   PodOrderItem,
@@ -115,12 +117,28 @@ export default function Orders() {
     ? "Cửa hàng đang bị khóa — không thể tạo đơn/import. Vui lòng liên hệ admin."
     : "";
   const canCreate = !createBlockMsg;
+  /**
+   * IMPORT (CSV / PDF / Google Sheets) vẫn cho chạy KHI CHƯA CÓ SHOP —
+   * đơn sẽ mang storeId rỗng và tên shop "Chưa có shop", gán shop sau.
+   * Chỉ chặn khi cửa hàng đang chọn bị KHÓA.
+   */
+  const importBlockMsg = shopLocked
+    ? "Cửa hàng đang bị khóa — không thể import. Vui lòng liên hệ admin."
+    : "";
+  const canImport = !importBlockMsg;
+  const NO_STORE_NAME = "Chưa có shop";
+  /** Tên shop ghi vào đơn import (chưa có shop thì ghi "Chưa có shop") */
+  const importStoreName = selectedStore?.name || NO_STORE_NAME;
   const [view, setView] = useState<ViewTab>("list");
   const [statusTab, setStatusTab] = useState("all");
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [trackFilter, setTrackFilter] = useState<"all" | "has" | "none">("all");
+  // Lọc theo cửa hàng: shop đang chọn | mọi shop | đơn CHƯA GÁN SHOP
+  const [shopFilter, setShopFilter] = useState<"current" | "all" | "none">(
+    "current"
+  );
   const [editing, setEditing] = useState<PodOrder | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [presetSku, setPresetSku] = useState<string | undefined>();
@@ -143,9 +161,34 @@ export default function Orders() {
     total: number;
   } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Modal import đơn từ link Google Sheets (ghép cột + sửa trực tiếp)
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  /** Gửi lô đơn đọc từ Google Sheets vào hàng đợi chờ admin duyệt */
+  const submitSheetOrders = async (
+    list: { id?: string; data: any }[],
+    sourceName: string
+  ) => {
+    const store = stores.find((s) => s.id === selectedStoreId);
+    try {
+      await submitImport.mutateAsync({
+        fileName: sourceName,
+        source: "sheet",
+        storeId: selectedStoreId,
+        storeName: store?.name || NO_STORE_NAME,
+        list,
+      });
+      message.success(
+        `Đã gửi ${list.length} đơn vào hàng đợi — chờ admin duyệt trước khi lên hệ thống`
+      );
+      setSheetOpen(false);
+    } catch (e) {
+      message.error("Không gửi được lô đơn vào hàng đợi. Vui lòng thử lại.");
+    }
+  };
 
   const handleImportPdf = async (file: File) => {
-    if (!canCreate) return message.warning(createBlockMsg);
+    if (!canImport) return message.warning(importBlockMsg);
     const store = stores.find((s) => s.id === selectedStoreId);
     try {
       const preview = await parseEtsyPackingSlipPdf(file, {
@@ -153,6 +196,10 @@ export default function Orders() {
         store,
         designs,
         variants,
+      });
+      // Chưa có shop -> ghi tên shop mặc định để dễ nhận biết, gán shop sau
+      preview.forEach((p: any) => {
+        if (!p.data.storeName) p.data.storeName = NO_STORE_NAME;
       });
       if (!preview.length) {
         message.error("Không tìm thấy đơn Etsy hợp lệ trong file PDF này");
@@ -262,10 +309,20 @@ export default function Orders() {
     [search]
   );
 
+  /** Số đơn chưa gán shop (import khi chưa có / chưa chọn cửa hàng) */
+  const noShopCount = useMemo(
+    () => allOrders.filter((o) => !String(o.storeId || "").trim()).length,
+    [allOrders]
+  );
+
   const filtered = useMemo(() => {
-    // Có từ khóa -> tìm trên đơn của tất cả cửa hàng; không thì chỉ store đang chọn
-    const source = search.trim() ? allOrders : orders;
+    // Có từ khóa hoặc lọc ngoài shop hiện tại -> tìm trên đơn của MỌI cửa hàng
+    const source =
+      search.trim() || shopFilter !== "current" ? allOrders : orders;
     return source.filter((o) => {
+      // Đơn chưa gán shop: storeId rỗng (import khi chưa có/chưa chọn cửa hàng)
+      const noShop = !String(o.storeId || "").trim();
+      if (shopFilter === "none" && !noShop) return false;
       if (statusTab !== "all" && o.status !== statusTab) return false;
       if (searchTerms.length) {
         const hay = searchIndex.get(o.id) || "";
@@ -289,6 +346,7 @@ export default function Orders() {
     fromDate,
     toDate,
     trackFilter,
+    shopFilter,
   ]);
 
   const paged = useMemo(
@@ -297,7 +355,7 @@ export default function Orders() {
   );
   useEffect(() => {
     setPage(1);
-  }, [statusTab, search, fromDate, toDate, trackFilter]);
+  }, [statusTab, search, fromDate, toDate, trackFilter, shopFilter]);
 
   // Bỏ selection của các đơn không còn tồn tại
   useEffect(() => {
@@ -348,6 +406,28 @@ export default function Orders() {
     const o = allOrders.find((x) => x.id === id);
     return o && o.status === "pending_payment" && !o.datePaid;
   });
+
+  // Đơn đã chọn mà CHƯA có shop -> cho gán vào cửa hàng đang chọn
+  const noShopSelectedIds = selectedIds.filter((id) => {
+    const o = allOrders.find((x) => x.id === id);
+    return o && !String(o.storeId || "").trim();
+  });
+
+  /** Gán các đơn chưa có shop vào cửa hàng đang chọn */
+  const handleAssignShop = async () => {
+    if (!selectedStore) return message.warning("Chưa chọn cửa hàng");
+    for (const id of noShopSelectedIds) {
+      await update.mutateAsync({
+        id,
+        storeId: selectedStore.id,
+        storeName: selectedStore.name,
+      } as any);
+    }
+    message.success(
+      `Đã gán ${noShopSelectedIds.length} đơn vào shop ${selectedStore.name}`
+    );
+    setSelectedIds([]);
+  };
 
   // Copy đơn = tạo 1 đơn MỚI dựa trên toàn bộ data của đơn gốc.
   // Đơn mới LUÔN về 0đ (giá từng sản phẩm = 0, tổng = 0) — khách chỉ trả khi tự bấm Pay.
@@ -563,7 +643,7 @@ export default function Orders() {
 
   /* ---------- Import CSV Etsy ---------- */
   const handleImportFile = async (file: File) => {
-    if (!canCreate) return message.warning(createBlockMsg);
+    if (!canImport) return message.warning(importBlockMsg);
     const rows = parseCSV(await file.text());
     const byOrder = new Map<string, any[]>();
     rows.forEach((r) => {
@@ -599,7 +679,7 @@ export default function Orders() {
         data: {
           orderCode: oid,
           storeId: selectedStoreId,
-          storeName: store?.name || "",
+          storeName: store?.name || NO_STORE_NAME,
           status: "pending_payment",
           tracking: "",
           source: "etsy",
@@ -715,7 +795,7 @@ export default function Orders() {
   };
 
   const confirmImport = async () => {
-    if (!canCreate) return message.warning(createBlockMsg);
+    if (!canImport) return message.warning(importBlockMsg);
     if (!(await ensureAccount())) return;
 
     // Đơn từ PDF: KHÔNG ghi thẳng lên hệ thống. Gửi cả lô vào hàng đợi,
@@ -727,7 +807,7 @@ export default function Orders() {
           fileName: importFileName,
           source: "pdf",
           storeId: selectedStoreId,
-          storeName: store?.name || "",
+          storeName: store?.name || NO_STORE_NAME,
           list: importPreview,
         });
         message.success(
@@ -782,13 +862,13 @@ export default function Orders() {
         </button>
         <button
           onClick={() => {
-            if (!canCreate) return message.warning(createBlockMsg);
+            if (!canImport) return message.warning(importBlockMsg);
             setView("import");
           }}
-          disabled={!canCreate}
-          title={!canCreate ? createBlockMsg : undefined}
+          disabled={!canImport}
+          title={!canImport ? importBlockMsg : undefined}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm border-0 ${
-            !canCreate
+            !canImport
               ? "cursor-not-allowed bg-transparent text-gray-300"
               : view === "import"
               ? "cursor-pointer bg-[#171826] text-white font-bold"
@@ -872,6 +952,21 @@ export default function Orders() {
               }}
             />
             <Select
+              className="h-[42px] w-[210px]"
+              value={shopFilter}
+              onChange={(v) => setShopFilter(v)}
+              options={[
+                { value: "current", label: "Shop đang chọn" },
+                { value: "all", label: "Tất cả shop" },
+                {
+                  value: "none",
+                  label: `Chưa có shop${
+                    noShopCount ? ` (${noShopCount})` : ""
+                  }`,
+                },
+              ]}
+            />
+            <Select
               className="h-[42px] w-[180px]"
               value={trackFilter}
               onChange={(v) => setTrackFilter(v)}
@@ -918,6 +1013,24 @@ export default function Orders() {
                 Đã chọn{" "}
                 <b className="text-[#171826]">{selectedIds.length}</b> đơn hàng
               </span>
+              {/* Gán shop cho các đơn đang chưa có shop */}
+              {noShopSelectedIds.length > 0 && selectedStore && (
+                <Popconfirm
+                  title={`Gán ${noShopSelectedIds.length} đơn vào shop "${selectedStore.name}"?`}
+                  description="Chỉ áp dụng cho các đơn đang chưa có shop."
+                  okText="Gán shop"
+                  cancelText="Hủy"
+                  onConfirm={handleAssignShop}
+                >
+                  <Button
+                    icon={<FiShoppingBag />}
+                    loading={update.isLoading}
+                    className="border-[#EADFC8] text-[#B79351] font-medium"
+                  >
+                    Gán vào {selectedStore.name} ({noShopSelectedIds.length})
+                  </Button>
+                </Popconfirm>
+              )}
               {/* Chỉ hiện nút thanh toán khi trong số đã chọn có đơn CHƯA thanh toán */}
               {payableSelectedIds.length > 0 && (
                 <Popconfirm
@@ -1338,6 +1451,16 @@ export default function Orders() {
               Chọn file CSV hoặc PDF
             </button>
             <Button
+              disabled={!canImport}
+              onClick={() => {
+                if (!canImport) return message.warning(importBlockMsg);
+                setSheetOpen(true);
+              }}
+              className="h-[46px] px-5 rounded-xl font-bold border-2 border-[#0E9F6E] text-[#0E9F6E]"
+            >
+              Import từ link Google Sheets
+            </Button>
+            <Button
               type="primary"
               disabled={!importPreview.length}
               loading={addMany.isLoading || submitImport.isLoading}
@@ -1374,6 +1497,15 @@ export default function Orders() {
               SKU, Quantity, Styles - Colors, Size, Personalization).
             </span>
           </div>
+
+          {/* Chưa có shop vẫn import được — đơn ghi tạm "Chưa có shop" */}
+          {!selectedStore && (
+            <div className="bg-[#FEF9E7] border border-[#F5E1A4] rounded-2xl px-5 py-3 text-sm text-[#8A6D1F]">
+              Bạn chưa chọn / chưa có cửa hàng — vẫn import bình thường, đơn sẽ
+              ghi tạm shop là <b>“{NO_STORE_NAME}”</b>, gán shop sau khi bạn tạo
+              hoặc kết nối cửa hàng.
+            </div>
+          )}
 
           {syncProgress ? (
             <div className="bg-[#FBF6EC] border border-[#EADFC8] rounded-2xl px-5 py-4">
@@ -1592,6 +1724,17 @@ export default function Orders() {
         open={!!editing}
         initial={editing}
         onClose={() => setEditing(null)}
+      />
+      {/* Import đơn từ link Google Sheets */}
+      <SheetImportModal
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        storeId={selectedStoreId}
+        storeName={importStoreName}
+        designs={designs}
+        variants={variants}
+        submitting={submitImport.isLoading}
+        onSubmit={submitSheetOrders}
       />
     </div>
   );
