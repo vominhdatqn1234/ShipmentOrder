@@ -8,11 +8,17 @@
  *   3. Bảng dữ liệu sửa được từng ô -> bấm gửi. Mỗi dòng = 1 sản phẩm,
  *      các dòng cùng "Mã đơn" được gộp thành 1 đơn.
  *
- * Đơn tạo ra được GỬI VÀO HÀNG ĐỢI chờ admin duyệt (giống luồng import PDF).
+ * Bấm Import -> đơn được đưa vào bảng PREVIEW của tab Import (giống luồng CSV),
+ * kiểm tra xong bấm "Đồng bộ lên Web" để ghi lên hệ thống.
  */
 import { Button, Input, InputNumber, Modal, Select, message } from "antd";
 import { useCallback, useMemo, useState } from "react";
-import { FiDownloadCloud, FiEdit3, FiPlus } from "react-icons/fi";
+import {
+  FiDownloadCloud,
+  FiEdit3,
+  FiPlus,
+  FiUploadCloud,
+} from "react-icons/fi";
 import { parseCSV } from "../../../utils/csvPod";
 import ExcelGrid from "./ExcelGrid";
 import {
@@ -186,6 +192,7 @@ export default function SheetImportModal({
   variants,
   submitting,
   onSubmit,
+  onSyncNow,
 }: {
   open: boolean;
   onClose: () => void;
@@ -195,6 +202,11 @@ export default function SheetImportModal({
   variants: PodVariant[];
   submitting: boolean;
   onSubmit: (
+    list: { id?: string; data: any }[],
+    sourceName: string
+  ) => Promise<void>;
+  /** Đồng bộ thẳng lên web, bỏ qua bước xem trước */
+  onSyncNow?: (
     list: { id?: string; data: any }[],
     sourceName: string
   ) => Promise<void>;
@@ -287,7 +299,7 @@ export default function SheetImportModal({
     [rows]
   );
 
-  /** Gom dòng theo mã đơn -> danh sách đơn gửi hàng đợi */
+  /** Gom dòng theo mã đơn -> danh sách đơn đưa sang bảng preview */
   const buildList = () => {
     const byOrder = new Map<string, Row[]>();
     rows.forEach((r) => {
@@ -375,9 +387,13 @@ export default function SheetImportModal({
     });
   };
 
-  const submit = async () => {
+  /** Dựng danh sách đơn + kiểm tra thông tin bắt buộc; lỗi thì trả về null */
+  const buildValidList = () => {
     const list = buildList();
-    if (!list.length) return message.error("Không có đơn nào để gửi");
+    if (!list.length) {
+      message.error("Không có đơn nào để import");
+      return null;
+    }
     const bad = list.find(
       (o) =>
         !o.data.customerName ||
@@ -386,11 +402,29 @@ export default function SheetImportModal({
         !o.data.state ||
         !o.data.zip
     );
-    if (bad)
-      return message.error(
+    if (bad) {
+      message.error(
         `Đơn ${bad.data.orderCode} còn thiếu thông tin bắt buộc (tên khách / địa chỉ / city / state / zip)`
       );
+      return null;
+    }
+    return list;
+  };
+
+  /** Đưa sang bảng xem trước ở tab Import */
+  const submit = async () => {
+    const list = buildValidList();
+    if (!list) return;
     await onSubmit(list, link);
+    reset();
+  };
+
+  /** Đồng bộ thẳng lên web, không qua bước xem trước */
+  const syncNow = async () => {
+    if (!onSyncNow) return;
+    const list = buildValidList();
+    if (!list) return;
+    await onSyncNow(list, link);
     reset();
   };
 
@@ -573,15 +607,27 @@ export default function SheetImportModal({
             <Button onClick={() => setStep(columns.length ? "map" : "link")}>
               Quay lại
             </Button>
-            <Button
-              type="primary"
-              loading={submitting}
-              disabled={!rows.length}
-              onClick={submit}
-              className="bg-[#C6A15B] border-0 h-[42px] px-6 rounded-xl font-bold"
-            >
-              Gửi {orderCount} đơn cho admin duyệt
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <Button
+                disabled={!rows.length || submitting}
+                onClick={submit}
+                className="h-[42px] px-5 rounded-xl font-bold border-2 border-[#C6A15B] text-[#B79351]"
+              >
+                Import {orderCount} đơn để xem trước
+              </Button>
+              {onSyncNow && (
+                <Button
+                  type="primary"
+                  loading={submitting}
+                  disabled={!rows.length}
+                  onClick={syncNow}
+                  icon={<FiUploadCloud />}
+                  className="bg-[#C6A15B] border-0 h-[42px] px-6 rounded-xl font-bold"
+                >
+                  Đồng bộ {orderCount} đơn lên Web
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}

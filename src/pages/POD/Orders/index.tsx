@@ -175,26 +175,54 @@ export default function Orders() {
   // Modal import đơn từ link Google Sheets (ghép cột + sửa trực tiếp)
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  /** Gửi lô đơn đọc từ Google Sheets vào hàng đợi chờ admin duyệt */
-  const submitSheetOrders = async (
+  /**
+   * Đơn đọc từ Google Sheets -> đưa vào bảng PREVIEW của tab Import (giống
+   * luồng CSV). Kiểm tra xong bấm "Đồng bộ lên Web" để ghi lên hệ thống.
+   */
+  const previewSheetOrders = async (
     list: { id?: string; data: any }[],
     sourceName: string
   ) => {
-    const store = stores.find((s) => s.id === selectedStoreId);
+    setImportPreview(list);
+    setImportSource("csv");
+    setImportFileName(sourceName);
+    setPreviewPage(1);
+    setPreviewSelectedIds([]);
+    setSheetOpen(false);
+    setView("import");
+    message.info(
+      `Đọc được ${list.length} đơn — kiểm tra lại rồi bấm "Đồng bộ lên Web"`
+    );
+  };
+
+  /** Đồng bộ THẲNG lên web từ modal Google Sheets (bỏ qua bước xem trước) */
+  const syncSheetOrders = async (
+    list: { id?: string; data: any }[],
+    _sourceName: string
+  ) => {
+    if (!(await ensureAccount())) return;
+    setSheetOpen(false);
+    setView("import");
+    setSyncProgress({ done: 0, total: list.length });
     try {
-      await submitImport.mutateAsync({
-        fileName: sourceName,
-        source: "sheet",
-        storeId: selectedStoreId,
-        storeName: store?.name || NO_STORE_NAME,
+      const res = await addMany.mutateAsync({
         list,
+        onProgress: (done, total) => setSyncProgress({ done, total }),
       });
-      message.success(
-        `Đã gửi ${list.length} đơn vào hàng đợi — chờ admin duyệt trước khi lên hệ thống`
-      );
-      setSheetOpen(false);
-    } catch (e) {
-      message.error("Không gửi được lô đơn vào hàng đợi. Vui lòng thử lại.");
+      const okCount = list.length - (res?.failed || 0);
+      if (res?.failed) {
+        message.warning(
+          `Đã đồng bộ ${okCount}/${list.length} đơn — ${res.failed} đơn lỗi dữ liệu bị bỏ qua`
+        );
+      } else {
+        message.success(`Đã đồng bộ ${list.length} đơn hàng lên web`);
+      }
+      setImportPreview([]);
+      setImportSource(null);
+      setImportFileName("");
+      setView("list");
+    } finally {
+      setSyncProgress(null);
     }
   };
 
@@ -1754,8 +1782,9 @@ export default function Orders() {
         storeName={importStoreName}
         designs={designs}
         variants={variants}
-        submitting={submitImport.isLoading}
-        onSubmit={submitSheetOrders}
+        submitting={addMany.isLoading}
+        onSubmit={previewSheetOrders}
+        onSyncNow={syncSheetOrders}
       />
     </div>
   );
