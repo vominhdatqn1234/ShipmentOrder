@@ -32,7 +32,23 @@ import { colors } from "./styles/colors";
 import Loader from "./components/Loader";
 import { ThemeAdminRoutes, ThemeRoutes } from "./routes";
 
-const queryClient = new QueryClient();
+/**
+ * Mặc định của react-query: không tải lại toàn bộ dữ liệu mỗi lần đổi trang
+ * hay quay lại tab trình duyệt (đơn hàng / bảng giá phôi rất nhiều dòng).
+ * Dữ liệu coi như còn "tươi" trong 60 giây; mọi thao tác sửa vẫn gọi
+ * invalidateQueries như cũ nên số liệu hiển thị không đổi.
+ */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      staleTime: 60 * 1000,
+      cacheTime: 10 * 60 * 1000,
+      retry: 1,
+    },
+  },
+});
 
 function App() {
   useAuth();

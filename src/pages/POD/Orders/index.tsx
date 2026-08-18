@@ -103,10 +103,21 @@ export default function Orders() {
   const { designs } = useDesigns();
   const { variants } = usePodVariants();
   const { selectedStoreId } = usePodStore();
-  // Phụ phí vùng in đặc biệt lấy theo bảng giá phôi POD (In vùng phụ)
+  // Phụ phí vùng in đặc biệt lấy theo bảng giá phôi POD (In vùng phụ).
+  // Bảng giá có hàng nghìn dòng nên nhớ lại kết quả đã tra theo phôi/size/màu.
+  const variantCache = useMemo(
+    () => new Map<string, ReturnType<typeof findVariant>>(),
+    [variants]
+  );
+  const variantOf = (it: PodOrderItem) => {
+    const key = `${it.productSku || ""}|${it.size || ""}|${it.color || ""}`;
+    if (variantCache.has(key)) return variantCache.get(key);
+    const v = findVariant(variants, it.productSku, it.size, it.color);
+    variantCache.set(key, v);
+    return v;
+  };
   const specialFee = (it: PodOrderItem) =>
-    findVariant(variants, it.productSku, it.size, it.color)?.printExtraArea ??
-    SPECIAL_PRINT_AREA_FEE;
+    variantOf(it)?.printExtraArea ?? SPECIAL_PRINT_AREA_FEE;
   const { ensureAccount } = useAccountGuard();
   // Chặn tạo đơn/import khi chưa có shop hoặc shop đang bị khóa
   const selectedStore = stores.find((s) => s.id === selectedStoreId);
@@ -309,6 +320,16 @@ export default function Orders() {
     [search]
   );
 
+  /**
+   * Tra đơn theo id bằng Map — trước đây mỗi lần chọn nhiều đơn phải quét lại
+   * toàn bộ danh sách cho TỪNG id (chọn 1000 đơn = cả triệu phép so sánh).
+   */
+  const orderById = useMemo(() => {
+    const m = new Map<string, PodOrder>();
+    allOrders.forEach((o) => m.set(o.id, o));
+    return m;
+  }, [allOrders]);
+
   /** Số đơn chưa gán shop (import khi chưa có / chưa chọn cửa hàng) */
   const noShopCount = useMemo(
     () => allOrders.filter((o) => !String(o.storeId || "").trim()).length,
@@ -387,13 +408,13 @@ export default function Orders() {
   // Trong số đơn đã chọn, chỉ đơn CHƯA thanh toán hoặc ĐÃ HỦY mới xóa được
   const DELETABLE_STATUSES = ["pending_payment", "cancelled"];
   const deletableSelectedIds = selectedIds.filter((id) => {
-    const o = allOrders.find((x) => x.id === id);
+    const o = orderById.get(id);
     return o && DELETABLE_STATUSES.includes(o.status);
   });
 
   // Chỉ hoàn tiền được đơn đã bấm Pay (có datePaid) và chưa ở tab Hoàn tiền/Đã hủy
   const refundableSelectedIds = selectedIds.filter((id) => {
-    const o = allOrders.find((x) => x.id === id);
+    const o = orderById.get(id);
     return (
       o &&
       !!o.datePaid &&
@@ -403,13 +424,13 @@ export default function Orders() {
 
   // Chỉ thanh toán được đơn CHƯA thanh toán (status chờ thanh toán & chưa có datePaid)
   const payableSelectedIds = selectedIds.filter((id) => {
-    const o = allOrders.find((x) => x.id === id);
+    const o = orderById.get(id);
     return o && o.status === "pending_payment" && !o.datePaid;
   });
 
   // Đơn đã chọn mà CHƯA có shop -> cho gán vào cửa hàng đang chọn
   const noShopSelectedIds = selectedIds.filter((id) => {
-    const o = allOrders.find((x) => x.id === id);
+    const o = orderById.get(id);
     return o && !String(o.storeId || "").trim();
   });
 
@@ -473,7 +494,7 @@ export default function Orders() {
   const handleCopySelected = async () => {
     let count = 0;
     for (const id of selectedIds) {
-      const o = allOrders.find((x) => x.id === id);
+      const o = orderById.get(id);
       if (!o) continue;
       await duplicateOrder(o);
       count++;
@@ -491,7 +512,7 @@ export default function Orders() {
   const handleReshipSelected = async () => {
     let count = 0;
     for (const id of selectedIds) {
-      const o = allOrders.find((x) => x.id === id);
+      const o = orderById.get(id);
       if (!o) continue;
       await duplicateOrder(o, { status: "reship", prefix: "RS" });
       count++;
@@ -520,7 +541,7 @@ export default function Orders() {
   const handleRefundSelected = async () => {
     let count = 0;
     for (const id of refundableSelectedIds) {
-      const o = allOrders.find((x) => x.id === id);
+      const o = orderById.get(id);
       if (!o) continue;
       await update.mutateAsync({
         id: o.id,
@@ -628,7 +649,7 @@ export default function Orders() {
     }
     let count = 0;
     for (const id of payableSelectedIds) {
-      const o = allOrders.find((x) => x.id === id);
+      const o = orderById.get(id);
       if (!o) continue;
       await update.mutateAsync({
         id: o.id,
