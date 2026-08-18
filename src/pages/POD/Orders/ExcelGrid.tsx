@@ -13,12 +13,16 @@
  */
 import { message } from "antd";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { FiChevronDown } from "react-icons/fi";
 
 export interface GridColumn {
   key: string;
   label: string;
   required?: boolean;
   width: number;
+  /** Có options = ô dạng chọn (dropdown) thay vì gõ tay */
+  options?: { value: string; label: string }[];
 }
 
 export type GridRowData = Record<string, string>;
@@ -105,10 +109,31 @@ const Row = memo(function Row({
             } ${isActive && !isEditing ? "outline outline-2 -outline-offset-2 outline-[#C6A15B]" : ""}`}
           >
             {isEditing ? (
-              <EditInput
-                initial={row[col.key] || ""}
-                onCommit={onEditCommit}
-              />
+              col.options ? (
+                <EditSelect
+                  initial={row[col.key] || ""}
+                  options={col.options}
+                  onCommit={onEditCommit}
+                />
+              ) : (
+                <EditInput
+                  initial={row[col.key] || ""}
+                  onCommit={onEditCommit}
+                />
+              )
+            ) : col.options ? (
+              <div className="group flex items-center gap-1 pl-2 pr-1 h-[30px] cursor-pointer">
+                <span
+                  className={`text-[12px] truncate flex-1 ${
+                    row[col.key] ? "" : "text-gray-300"
+                  }`}
+                >
+                  {row[col.key] || "Chọn..."}
+                </span>
+                <span className="w-[18px] h-[18px] shrink-0 rounded border border-gray-300 bg-gray-50 text-gray-500 flex items-center justify-center group-hover:border-[#C6A15B] group-hover:text-[#C6A15B] group-hover:bg-[#FBF6EC] transition-colors">
+                  <FiChevronDown size={12} />
+                </span>
+              </div>
             ) : (
               <div className="px-2 text-[12px] leading-[30px] truncate">
                 {row[col.key] || ""}
@@ -162,6 +187,137 @@ function EditInput({
       onBlur={(e) => onCommit(e.currentTarget.value, "blur")}
       className="cell-editor w-full h-[30px] px-2 text-[12px] border-0 outline outline-2 -outline-offset-2 outline-[#C6A15B] bg-white"
     />
+  );
+}
+
+/**
+ * Ô dạng chọn — tự vẽ danh sách (thẻ select gốc không mở được bằng code trên
+ * mọi trình duyệt). Danh sách dùng position fixed nên không bị bảng cắt mất.
+ */
+function EditSelect({
+  initial,
+  options,
+  onCommit,
+}: {
+  initial: string;
+  options: { value: string; label: string }[];
+  onCommit: (value: string, key: "enter" | "tab" | "esc" | "blur") => void;
+}) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    up: boolean;
+  } | null>(null);
+  const items = useMemo(
+    () => [{ value: "", label: "— Trống —" }, ...options],
+    [options]
+  );
+  const [hi, setHi] = useState(() => {
+    const i = options.findIndex((o) => o.value === initial);
+    return i < 0 ? 0 : i + 1;
+  });
+
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const listH = Math.min(240, items.length * 30 + 8);
+    const up = r.bottom + listH > window.innerHeight && r.top > listH;
+    setRect({
+      left: r.left,
+      top: up ? r.top - listH - 2 : r.bottom + 2,
+      width: Math.max(160, r.width),
+      up,
+    });
+    el.focus();
+  }, [items.length]);
+
+  // Bấm ra ngoài -> đóng, giữ nguyên giá trị cũ.
+  // Phải đăng ký ở tick sau: nếu gắn ngay, chính cú click vừa mở dropdown sẽ
+  // lọt vào listener này và đóng lại lập tức (nhìn như dropdown không hiện).
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (boxRef.current?.contains(t) || dropRef.current?.contains(t)) return;
+      onCommit(initial, "blur");
+    };
+    const t = window.setTimeout(
+      () => window.addEventListener("mousedown", onDown),
+      0
+    );
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("mousedown", onDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial]);
+
+  return (
+    <div
+      ref={boxRef}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setHi((i) => Math.min(items.length - 1, i + 1));
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setHi((i) => Math.max(0, i - 1));
+        } else if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          onCommit(items[hi]?.value ?? initial, e.key === "Tab" ? "tab" : "enter");
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          onCommit(initial, "esc");
+        }
+      }}
+      className="relative h-[30px] pl-2 pr-1 flex items-center gap-1 outline outline-2 -outline-offset-2 outline-[#C6A15B] bg-white cursor-pointer"
+    >
+      <span
+        className={`text-[12px] truncate flex-1 ${
+          initial ? "" : "text-gray-300"
+        }`}
+      >
+        {initial || "Chọn..."}
+      </span>
+      <span className="w-[18px] h-[18px] shrink-0 rounded border border-[#C6A15B] bg-[#FBF6EC] text-[#B79351] flex items-center justify-center">
+        <FiChevronDown size={12} className="rotate-180" />
+      </span>
+
+      {/* Đưa ra ngoài body: tránh bị bảng cắt hoặc lớp phủ của modal che mất */}
+      {rect &&
+        createPortal(
+          <div
+            ref={dropRef}
+            style={{ left: rect.left, top: rect.top, width: rect.width }}
+            className="fixed z-[3000] max-h-[240px] overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+          >
+            {items.map((o, i) => (
+              <button
+                key={o.value || "__empty"}
+                onMouseEnter={() => setHi(i)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onCommit(o.value, "enter");
+                }}
+                className={`w-full text-left px-3 py-1.5 text-[12px] border-0 cursor-pointer truncate ${
+                  i === hi ? "bg-[#FBF6EC] text-[#171826]" : "bg-transparent"
+                } ${o.value ? "" : "text-gray-400"} ${
+                  o.value === initial ? "font-bold" : ""
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )}
+    </div>
   );
 }
 
@@ -283,17 +439,26 @@ export default function ExcelGrid({
 
   const focusGrid = () => wrapRef.current?.focus();
 
-  const onCellDown = useCallback((e: React.MouseEvent, r: number, c: number) => {
-    flushEditRef.current();
-    if (e.shiftKey) {
-      setSel((s) => ({ ...s, r2: r, c2: c }));
-    } else {
-      dragging.current = true;
+  const onCellDown = useCallback(
+    (e: React.MouseEvent, r: number, c: number) => {
+      flushEditRef.current();
+      if (e.shiftKey) {
+        setSel((s) => ({ ...s, r2: r, c2: c }));
+        return;
+      }
       setSel({ r1: r, c1: c, r2: r, c2: c });
       setActive({ r, c });
+      // Cột dạng chọn: bấm 1 lần là mở dropdown luôn cho nhanh
+      if (columns[c]?.options) {
+        editingRef.current = { r, c };
+        setEditing({ r, c });
+        return;
+      }
+      dragging.current = true;
       setEditing(null);
-    }
-  }, []);
+    },
+    [columns]
+  );
 
   const onCellEnter = useCallback((r: number, c: number) => {
     if (!dragging.current) return;
@@ -373,9 +538,9 @@ export default function ExcelGrid({
   const flushEdit = useCallback(() => {
     const cell = editingRef.current;
     if (!cell) return;
-    const el = wrapRef.current?.querySelector<HTMLInputElement>(
-      "input.cell-editor"
-    );
+    const el = wrapRef.current?.querySelector<
+      HTMLInputElement | HTMLSelectElement
+    >(".cell-editor");
     const value = el?.value;
     editingRef.current = null;
     setEditing(null);
@@ -620,10 +785,11 @@ export default function ExcelGrid({
       default:
         break;
     }
-    // Gõ ký tự thường -> vào chế độ sửa với ô trống (như Excel)
+    // Gõ ký tự thường -> vào chế độ sửa với ô trống (như Excel).
+    // Cột dạng chọn thì chỉ mở dropdown, không ghi đè bằng ký tự vừa gõ.
     if (!mod && e.key.length === 1) {
       e.preventDefault();
-      setCell(r, c, e.key);
+      if (!columns[c]?.options) setCell(r, c, e.key);
       startEdit(r, c);
     }
   };
@@ -669,6 +835,12 @@ export default function ExcelGrid({
                 >
                   {col.label}
                   {col.required && <span className="text-red-500"> *</span>}
+                  {col.options && (
+                    <FiChevronDown
+                      size={10}
+                      className="inline ml-1 -mt-[1px] text-gray-400"
+                    />
+                  )}
                 </th>
               ))}
             </tr>

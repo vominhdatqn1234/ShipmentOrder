@@ -1779,7 +1779,8 @@ export default function Orders() {
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         storeId={selectedStoreId}
-        storeName={importStoreName}
+        storeName={selectedStore?.name || ""}
+        stores={stores}
         designs={designs}
         variants={variants}
         submitting={addMany.isLoading}

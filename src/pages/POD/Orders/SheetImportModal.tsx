@@ -31,6 +31,7 @@ import {
 /* ------------------------------- Field map ------------------------------- */
 
 type FieldKey =
+  | "storeName"
   | "orderCode"
   | "customerName"
   | "customerEmail"
@@ -70,7 +71,8 @@ interface FieldDef {
   width: number;
 }
 
-const FIELDS: FieldDef[] = [
+const BASE_FIELDS: FieldDef[] = [
+  { key: "storeName", label: "Shop", group: "order", hints: ["store", "shop", "cua hang", "ten shop"], width: 170 },
   { key: "orderCode", label: "Mã đơn", required: true, group: "order", hints: ["order id", "orderid", "ma don", "order"], width: 130 },
   { key: "customerName", label: "Tên khách", required: true, group: "order", hints: ["customer name", "customers name", "buyer", "ship name", "ten khach", "name"], width: 160 },
   { key: "customerEmail", label: "Email", group: "order", hints: ["email", "mail"], width: 170 },
@@ -127,7 +129,7 @@ function guessMapping(columns: string[]): Record<string, string> {
   const used = new Set<string>();
   // Vòng 1: khớp CHÍNH XÁC tên cột trước (vd "Product Note" phải về Ghi chú SP,
   // không bị field "Phôi" chộp mất vì chứa chữ "product").
-  FIELDS.forEach((f) => {
+  BASE_FIELDS.forEach((f) => {
     const hit = columns.find(
       (c) => !used.has(c) && f.hints.some((h) => norm(c) === norm(h))
     );
@@ -137,7 +139,7 @@ function guessMapping(columns: string[]): Record<string, string> {
     }
   });
   // Vòng 2: khớp gần đúng cho các field còn trống
-  FIELDS.forEach((f) => {
+  BASE_FIELDS.forEach((f) => {
     if (out[f.key]) return;
     const hit = columns.find(
       (c) => !used.has(c) && f.hints.some((h) => norm(c).includes(norm(h)))
@@ -166,9 +168,15 @@ function newRowId(): string {
   ROW_SEQ += 1;
   return `r${ROW_SEQ}`;
 }
-/** Dòng trống mặc định: SL = 1, Country = US */
-function emptyRow(): Row {
-  return { __id: newRowId(), __v: "0", quantity: "1", country: "US" };
+/** Dòng trống mặc định: SL = 1, Country = US, shop = shop đang chọn */
+function emptyRow(defaultStore = ""): Row {
+  return {
+    __id: newRowId(),
+    __v: "0",
+    quantity: "1",
+    country: "US",
+    storeName: defaultStore,
+  };
 }
 
 /** Thanh cuộn mảnh cho bảng dữ liệu (mặc định của macOS/Windows khá dày) */
@@ -188,6 +196,7 @@ export default function SheetImportModal({
   onClose,
   storeId,
   storeName,
+  stores,
   designs,
   variants,
   submitting,
@@ -198,6 +207,8 @@ export default function SheetImportModal({
   onClose: () => void;
   storeId: string;
   storeName: string;
+  /** Danh sách shop của seller — dùng cho cột "Shop" dạng dropdown */
+  stores: { id: string; name: string }[];
   designs: Design[];
   variants: PodVariant[];
   submitting: boolean;
@@ -211,6 +222,26 @@ export default function SheetImportModal({
     sourceName: string
   ) => Promise<void>;
 }) {
+  // Cột "Shop" là dropdown chọn từ danh sách shop của seller (được để trống)
+  const FIELDS = useMemo(
+    () =>
+      BASE_FIELDS.map((f) =>
+        f.key === "storeName"
+          ? {
+              ...f,
+              options: stores.map((st) => ({
+                value: st.name,
+                label: st.name,
+              })),
+            }
+          : f
+      ),
+    [stores]
+  );
+
+  /** Dòng trống mới luôn gán sẵn shop đang chọn (vẫn xoá được để trống) */
+  const newRow = useCallback(() => emptyRow(storeName), [storeName]);
+
   const [step, setStep] = useState<"link" | "map" | "grid">("link");
   const [link, setLink] = useState("");
   const [loading, setLoading] = useState(false);
@@ -275,6 +306,7 @@ export default function SheetImportModal({
       });
       if (!out.quantity) out.quantity = "1";
       if (!out.country) out.country = "US";
+      if (!out.storeName) out.storeName = storeName;
       return out;
     });
     // Bỏ dòng trống hoàn toàn (sheet hay dư dòng cuối)
@@ -288,9 +320,9 @@ export default function SheetImportModal({
     const count = Math.max(1, Math.min(200, Math.floor(n) || 1));
     setRows((prev) => [
       ...prev,
-      ...Array.from({ length: count }, () => emptyRow()),
+      ...Array.from({ length: count }, () => newRow()),
     ]);
-  }, []);
+  }, [newRow]);
 
   const orderCount = useMemo(
     () =>
@@ -309,8 +341,19 @@ export default function SheetImportModal({
       byOrder.get(code)!.push(r);
     });
 
+    // Tên shop trên dòng -> shop thật của seller (bỏ trống thì dùng shop đang chọn)
+    const storeByName = new Map(
+      stores.map((st) => [st.name.trim().toLowerCase(), st])
+    );
+
     return Array.from(byOrder.entries()).map(([code, group]) => {
       const head = group[0];
+      const shopCell = String(head.storeName || "").trim();
+      const matched = storeByName.get(shopCell.toLowerCase());
+      // Có chọn shop -> dùng shop đó; để trống -> theo shop đang chọn ở sidebar;
+      // gõ tên lạ -> giữ nguyên tên, chưa gán được shop (gán sau ở tab đơn hàng)
+      const rowStoreId = shopCell ? matched?.id || "" : storeId;
+      const rowStoreName = shopCell ? matched?.name || shopCell : storeName;
       const items = group.map((r) => {
         const extraAreas = EXTRA_AREAS.filter((a) => (r[a.key] || "").trim()).map(
           (a) => ({ name: a.name, url: (r[a.key] || "").trim() })
@@ -360,8 +403,8 @@ export default function SheetImportModal({
         id: `sheet-${code}`,
         data: {
           orderCode: code,
-          storeId,
-          storeName,
+          storeId: rowStoreId,
+          storeName: rowStoreName,
           status: "pending_payment",
           tracking: "",
           source: "csv",
@@ -480,7 +523,7 @@ export default function SheetImportModal({
           <Button
             icon={<FiEdit3 />}
             onClick={() => {
-              setRows(Array.from({ length: 10 }, () => emptyRow()));
+              setRows(Array.from({ length: 10 }, () => newRow()));
               setStep("grid");
             }}
           >
@@ -600,7 +643,7 @@ export default function SheetImportModal({
             columns={FIELDS}
             rows={rows}
             onRowsChange={setRows}
-            makeEmptyRow={emptyRow}
+            makeEmptyRow={newRow}
           />
 
           <div className="flex justify-between items-center pt-1">
