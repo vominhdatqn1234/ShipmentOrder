@@ -51,6 +51,9 @@ const Row = memo(function Row({
   selC2,
   activeC,
   editC,
+  isLastSelRow,
+  fillMark,
+  onFillStart,
   onCellDown,
   onCellEnter,
   onCellDouble,
@@ -66,6 +69,11 @@ const Row = memo(function Row({
   selC2: number;
   activeC: number;
   editC: number;
+  /** Dòng cuối vùng chọn -> hiện nút vuông kéo copy xuống (fill handle) */
+  isLastSelRow: boolean;
+  /** Dòng đang nằm trong vùng kéo copy (xem trước) */
+  fillMark: boolean;
+  onFillStart: (e: React.MouseEvent) => void;
   onCellDown: (e: React.MouseEvent, r: number, c: number) => void;
   onCellEnter: (r: number, c: number) => void;
   onCellDouble: (r: number, c: number) => void;
@@ -98,7 +106,7 @@ const Row = memo(function Row({
             onDoubleClick={() => onCellDouble(rowIndex, c)}
             onContextMenu={(e) => onCellContext(e, rowIndex, c)}
             style={{ minWidth: col.width, maxWidth: col.width }}
-            className={`h-[30px] px-0 border-b border-r border-gray-100 align-middle select-none ${
+            className={`relative h-[30px] px-0 border-b border-r border-gray-100 align-middle select-none ${
               isEditing
                 ? "bg-white"
                 : inSel
@@ -106,6 +114,10 @@ const Row = memo(function Row({
                 : missing
                 ? "bg-[#FDECEC]"
                 : "bg-white"
+            } ${
+              fillMark && c >= selC1 && c <= selC2
+                ? "bg-[#FDF6E6] outline-dashed outline-1 -outline-offset-1 outline-[#C6A15B]"
+                : ""
             } ${isActive && !isEditing ? "outline outline-2 -outline-offset-2 outline-[#C6A15B]" : ""}`}
           >
             {isEditing ? (
@@ -138,6 +150,13 @@ const Row = memo(function Row({
               <div className="px-2 text-[12px] leading-[30px] truncate">
                 {row[col.key] || ""}
               </div>
+            )}
+            {isLastSelRow && inSel && c === selC2 && !isEditing && (
+              <span
+                onMouseDown={onFillStart}
+                title="Kéo xuống để copy giá trị (fill)"
+                className="absolute -bottom-[3px] -right-[3px] w-[7px] h-[7px] bg-[#C6A15B] border border-white rounded-[1px] cursor-crosshair z-[2]"
+              />
             )}
           </td>
         );
@@ -345,7 +364,14 @@ export default function ExcelGrid({
   // sự kiện blur -> vẫn lấy lại được giá trị vừa gõ để lưu.
   const editingRef = useRef<{ r: number; c: number } | null>(null);
   const dragging = useRef(false);
+  // Vị trí con trỏ + vòng lặp tự cuộn khi kéo chọn chạm mép bảng (giống Excel)
+  const pointer = useRef({ x: 0, y: 0 });
+  const rafRef = useRef(0);
+  // Kéo nút vuông góc dưới phải để copy giá trị xuống/lên (fill như Excel)
+  const filling = useRef(false);
+  const [fillTo, setFillTo] = useState<number | null>(null);
   const flushEditRef = useRef<() => void>(() => {});
+  const applyFillRef = useRef<() => void>(() => {});
   const wrapRef = useRef<HTMLDivElement>(null);
   const undoStack = useRef<GridRowData[][]>([]);
   const redoStack = useRef<GridRowData[][]>([]);
@@ -431,11 +457,80 @@ export default function ExcelGrid({
   /* ------------------------------ Chọn / focus ----------------------------- */
 
 
-  useEffect(() => {
-    const stop = () => (dragging.current = false);
-    window.addEventListener("mouseup", stop);
-    return () => window.removeEventListener("mouseup", stop);
+  const stopAutoScroll = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
   }, []);
+
+  useEffect(() => {
+    const stop = () => {
+      dragging.current = false;
+      stopAutoScroll();
+      if (filling.current) applyFillRef.current();
+    };
+    window.addEventListener("mouseup", stop);
+    return () => {
+      window.removeEventListener("mouseup", stop);
+      stopAutoScroll();
+    };
+  }, [stopAutoScroll]);
+
+  /**
+   * Kéo chọn tới sát mép bảng -> tự cuộn tiếp và mở rộng vùng chọn theo ô đang
+   * nằm dưới con trỏ (giống thao tác bôi đen kéo dài bên Excel).
+   */
+  const autoScrollStep = useCallback(() => {
+    const el = wrapRef.current;
+    if (!el || (!dragging.current && !filling.current)) {
+      stopAutoScroll();
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const { x, y } = pointer.current;
+    const EDGE = 40; // vùng mép kích hoạt cuộn
+    const MAX = 24; // tốc độ cuộn tối đa mỗi khung hình
+    let dx = 0;
+    let dy = 0;
+    if (y > r.bottom - EDGE)
+      dy = Math.min(MAX, ((y - (r.bottom - EDGE)) / EDGE) * MAX);
+    else if (y < r.top + EDGE)
+      dy = -Math.min(MAX, ((r.top + EDGE - y) / EDGE) * MAX);
+    if (x > r.right - EDGE)
+      dx = Math.min(MAX, ((x - (r.right - EDGE)) / EDGE) * MAX);
+    else if (x < r.left + EDGE)
+      dx = -Math.min(MAX, ((r.left + EDGE - x) / EDGE) * MAX);
+    if (dx || dy) {
+      el.scrollLeft += dx;
+      el.scrollTop += dy;
+    }
+    // Ô dưới con trỏ (kẹp trong khung bảng) -> mở rộng vùng chọn tới đó
+    const cx = Math.max(r.left + 2, Math.min(r.right - 2, x));
+    const cy = Math.max(r.top + 2, Math.min(r.bottom - 2, y));
+    const hit = document
+      .elementFromPoint(cx, cy)
+      ?.closest("[data-cell]") as HTMLElement | null;
+    const key = hit?.getAttribute("data-cell");
+    if (key) {
+      const [rr, cc] = key.split("-").map(Number);
+      if (filling.current) setFillTo((v) => (v === rr ? v : rr));
+      else
+        setSel((s) =>
+          s.r2 === rr && s.c2 === cc ? s : { ...s, r2: rr, c2: cc }
+        );
+    }
+    rafRef.current = requestAnimationFrame(autoScrollStep);
+  }, [stopAutoScroll]);
+
+  const onGridMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!dragging.current && !filling.current) return;
+      pointer.current = { x: e.clientX, y: e.clientY };
+      if (!rafRef.current) rafRef.current = requestAnimationFrame(autoScrollStep);
+    },
+    [autoScrollStep]
+  );
 
   const focusGrid = () => wrapRef.current?.focus();
 
@@ -443,6 +538,8 @@ export default function ExcelGrid({
     (e: React.MouseEvent, r: number, c: number) => {
       flushEditRef.current();
       if (e.shiftKey) {
+        // Shift + giữ chuột kéo -> mở rộng vùng chọn liên tục
+        dragging.current = true;
         setSel((s) => ({ ...s, r2: r, c2: c }));
         return;
       }
@@ -461,6 +558,10 @@ export default function ExcelGrid({
   );
 
   const onCellEnter = useCallback((r: number, c: number) => {
+    if (filling.current) {
+      setFillTo(r);
+      return;
+    }
     if (!dragging.current) return;
     setSel((s) => ({ ...s, r2: r, c2: c }));
   }, []);
@@ -553,6 +654,59 @@ export default function ExcelGrid({
 
   flushEditRef.current = flushEdit;
 
+  /* ------------------------------ Fill (kéo copy) -------------------------- */
+
+  /** Bắt đầu kéo nút vuông góc dưới phải vùng chọn */
+  const onFillStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      flushEditRef.current();
+      filling.current = true;
+      dragging.current = false;
+      setFillTo(norm(sel).r2);
+    },
+    [sel]
+  );
+
+  /**
+   * Thả chuột -> copy giá trị vùng chọn xuống (hoặc lên) các dòng vừa kéo qua,
+   * lặp lại theo chu kỳ giống Excel khi vùng nguồn có nhiều dòng.
+   */
+  const applyFill = useCallback(() => {
+    const s = norm(sel);
+    const to = fillTo;
+    filling.current = false;
+    setFillTo(null);
+    if (to === null || (to <= s.r2 && to >= s.r1)) return;
+
+    const srcLen = s.r2 - s.r1 + 1;
+    const next = [...rows];
+    const writeRow = (r: number, srcIdx: number) => {
+      if (r < 0 || r >= next.length) return;
+      const src = next[s.r1 + srcIdx];
+      if (!src) return;
+      const copy = { ...next[r] };
+      for (let c = s.c1; c <= s.c2; c++) copy[columns[c].key] = src[columns[c].key] || "";
+      next[r] = copy;
+    };
+    if (to > s.r2) {
+      for (let r = s.r2 + 1; r <= to; r++) writeRow(r, (r - s.r2 - 1) % srcLen);
+    } else {
+      for (let r = s.r1 - 1; r >= to; r--)
+        writeRow(r, srcLen - 1 - ((s.r1 - 1 - r) % srcLen));
+    }
+    commitRows(next);
+    setSel({
+      r1: Math.min(s.r1, to),
+      c1: s.c1,
+      r2: Math.max(s.r2, to),
+      c2: s.c2,
+    });
+  }, [sel, fillTo, rows, columns, commitRows]);
+
+  applyFillRef.current = applyFill;
+
   /* --------------------------- Copy / Cut / Paste -------------------------- */
 
   const selText = useCallback(() => {
@@ -578,30 +732,60 @@ export default function ExcelGrid({
     commitRows(next);
   }, [sel, rows, columns, commitRows]);
 
-  /** Dán khối TSV bắt đầu từ ô đang chọn (tự thêm dòng nếu thiếu) */
+  /**
+   * Dán dữ liệu vào bảng, hành xử như Excel:
+   *  - Vùng chọn LỚN HƠN khối vừa copy -> lặp khối phủ kín vùng chọn
+   *    (copy 1 ô rồi bôi nhiều dòng và dán = điền giá trị đó cho mọi dòng).
+   *  - Ngược lại -> đổ từ ô đang đứng, thiếu dòng thì tự thêm dòng mới.
+   */
   const pasteText = useCallback(
     (text: string) => {
       const lines = text.replace(/\r/g, "").replace(/\n+$/, "").split("\n");
       if (!lines.length) return;
+      const block = lines.map((l) => l.split("\t"));
+      const bRows = block.length;
+      const bCols = Math.max(...block.map((b) => b.length));
       const s = norm(sel);
+      const selRows = s.r2 - s.r1 + 1;
+      const selCols = s.c2 - s.c1 + 1;
       const next = [...rows];
-      lines.forEach((line, li) => {
+
+      // Điền lặp khối vào đúng vùng đang bôi
+      if ((selRows > 1 || selCols > 1) && (selRows > bRows || selCols > bCols)) {
+        for (let i = 0; i < selRows; i++) {
+          const r = s.r1 + i;
+          if (r >= next.length) break;
+          const row = { ...next[r] };
+          for (let j = 0; j < selCols; j++) {
+            const col = columns[s.c1 + j];
+            if (!col) continue;
+            const cell = block[i % bRows][j % bCols];
+            row[col.key] = (cell ?? "").trim();
+          }
+          next[r] = row;
+        }
+        commitRows(next);
+        message.success(`Đã dán vào ${selRows} dòng`);
+        return;
+      }
+
+      // Dán bình thường: đổ từ ô neo, tự thêm dòng nếu thiếu
+      block.forEach((cells, li) => {
         const r = s.r1 + li;
         while (next.length <= r) next.push(makeEmptyRow());
         const row = { ...next[r] };
-        line.split("\t").forEach((cell, ci) => {
+        cells.forEach((cell, ci) => {
           const col = columns[s.c1 + ci];
           if (col) row[col.key] = cell.trim();
         });
         next[r] = row;
       });
       commitRows(next);
-      const lastCols = Math.max(...lines.map((l) => l.split("\t").length));
       setSel({
         r1: s.r1,
         c1: s.c1,
-        r2: s.r1 + lines.length - 1,
-        c2: Math.min(columns.length - 1, s.c1 + lastCols - 1),
+        r2: s.r1 + bRows - 1,
+        c2: Math.min(columns.length - 1, s.c1 + bCols - 1),
       });
     },
     [sel, rows, columns, commitRows, makeEmptyRow]
@@ -802,6 +986,7 @@ export default function ExcelGrid({
         ref={wrapRef}
         tabIndex={0}
         onKeyDown={onKeyDown}
+        onMouseMove={onGridMouseMove}
         onCopy={(e) => {
           e.preventDefault();
           e.clipboardData.setData("text/plain", selText());
@@ -857,6 +1042,12 @@ export default function ExcelGrid({
                   columns={columns}
                   selC1={inRange ? s.c1 : -1}
                   selC2={inRange ? s.c2 : -1}
+                  isLastSelRow={r === s.r2}
+                  fillMark={
+                    fillTo !== null &&
+                    ((r > s.r2 && r <= fillTo) || (r < s.r1 && r >= fillTo))
+                  }
+                  onFillStart={onFillStart}
                   activeC={active.r === r ? active.c : -1}
                   editC={editing && editing.r === r ? editing.c : -1}
                   onCellDown={onCellDown}
