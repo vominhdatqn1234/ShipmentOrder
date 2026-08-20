@@ -1,4 +1,12 @@
-import { AutoComplete, InputNumber, Popover, Select, Tooltip, message } from "antd";
+import {
+  AutoComplete,
+  Image,
+  InputNumber,
+  Popover,
+  Select,
+  Tooltip,
+  message,
+} from "antd";
 import { memo, useEffect, useRef, useState } from "react";
 import { FiDownload, FiUploadCloud } from "react-icons/fi";
 import {
@@ -70,6 +78,8 @@ function Thumb({
   bg?: string;
 }) {
   const [idx, setIdx] = useState(0);
+  // Bấm vào ảnh -> mở modal xem full
+  const [preview, setPreview] = useState(false);
   const candidates = imageUrlCandidates(url);
   // Có màu item -> nền + viền theo màu, thêm padding để màu luôn lộ ra
   // thành khung quanh ảnh (kể cả ảnh JPEG đặc phủ kín ô)
@@ -87,6 +97,7 @@ function Thumb({
     ) : null;
   const box = (
     <div
+      onClick={() => img && setPreview(true)}
       style={bgStyle}
       className={`${
         small ? "w-[34px] h-[34px]" : "w-[52px] h-[52px]"
@@ -107,26 +118,39 @@ function Thumb({
   );
   if (!img) return box;
   return (
-    <Popover
-      title={tag}
-      content={
-        <div
-          style={bgStyle}
-          className={`w-[280px] h-[280px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden ${
-            bg ? "p-2" : ""
-          }`}
-        >
-          <img
-            src={candidates[idx]}
-            alt={tag}
-            referrerPolicy="no-referrer"
-            className="max-w-full max-h-full object-contain rounded"
-          />
-        </div>
-      }
-    >
-      {box}
-    </Popover>
+    <>
+      <Popover
+        title={tag}
+        content={
+          <div
+            style={bgStyle}
+            className={`w-[280px] h-[280px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden ${
+              bg ? "p-2" : ""
+            }`}
+          >
+            <img
+              src={candidates[idx]}
+              alt={tag}
+              referrerPolicy="no-referrer"
+              className="max-w-full max-h-full object-contain rounded"
+            />
+          </div>
+        }
+      >
+        {box}
+      </Popover>
+      {/* Modal xem ảnh full khi bấm vào thumbnail */}
+      <Image
+        src={candidates[idx]}
+        alt={tag}
+        style={{ display: "none" }}
+        preview={{
+          visible: preview,
+          src: candidates[idx],
+          onVisibleChange: setPreview,
+        }}
+      />
+    </>
   );
 }
 

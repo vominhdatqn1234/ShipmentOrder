@@ -1,4 +1,4 @@
-import { Popover } from "antd";
+import { Image, Popover } from "antd";
 import { useState } from "react";
 import {
   PodOrder,
@@ -39,6 +39,8 @@ export function orderItems(order: PodOrder): PodOrderItem[] {
 /** Thumbnail thiết kế, hover để xem ảnh lớn (chỉ xem, không sửa) */
 export function Thumb({ url, tag }: { url: string; tag: string }) {
   const [idx, setIdx] = useState(0);
+  // Bấm vào ảnh -> mở modal xem full
+  const [preview, setPreview] = useState(false);
   const candidates = imageUrlCandidates(String(url || ""));
   const img =
     url && idx < candidates.length ? (
@@ -53,6 +55,7 @@ export function Thumb({ url, tag }: { url: string; tag: string }) {
     ) : null;
   const box = (
     <div
+      onClick={() => img && setPreview(true)}
       className={`w-[46px] h-[46px] shrink-0 bg-gray-50 border border-gray-200 rounded-md flex items-center justify-center overflow-hidden ${
         img ? "cursor-zoom-in" : ""
       }`}
@@ -66,21 +69,34 @@ export function Thumb({ url, tag }: { url: string; tag: string }) {
   );
   if (!img) return box;
   return (
-    <Popover
-      title={tag}
-      content={
-        <div className="w-[280px] h-[280px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
-          <img
-            src={candidates[idx]}
-            alt={tag}
-            referrerPolicy="no-referrer"
-            className="max-w-full max-h-full object-contain rounded"
-          />
-        </div>
-      }
-    >
-      {box}
-    </Popover>
+    <>
+      <Popover
+        title={tag}
+        content={
+          <div className="w-[280px] h-[280px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+            <img
+              src={candidates[idx]}
+              alt={tag}
+              referrerPolicy="no-referrer"
+              className="max-w-full max-h-full object-contain rounded"
+            />
+          </div>
+        }
+      >
+        {box}
+      </Popover>
+      {/* Modal xem ảnh full khi bấm vào thumbnail */}
+      <Image
+        src={candidates[idx]}
+        alt={tag}
+        style={{ display: "none" }}
+        preview={{
+          visible: preview,
+          src: candidates[idx],
+          onVisibleChange: setPreview,
+        }}
+      />
+    </>
   );
 }
 
