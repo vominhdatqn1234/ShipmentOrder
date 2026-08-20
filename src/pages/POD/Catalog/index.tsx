@@ -1,11 +1,65 @@
-import { Input, Select } from "antd";
+import { Image, Input, Popover, Select } from "antd";
 import { useMemo, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { useBaseProducts } from "../../../hooks/usePod";
 import { BaseProduct } from "../../../models/pod";
+import { toDirectImageUrl } from "../../../utils/imageUrl";
 
 type SortKey = "newest" | "priceAsc" | "priceDesc" | "nameAsc";
+
+/**
+ * Ảnh phôi trên thẻ sản phẩm: rê chuột vào xem ảnh lớn ngay tại chỗ,
+ * bấm vào mở modal xem full (zoom / xoay / tải về).
+ */
+function ProductImage({ url, alt }: { url?: string; alt: string }) {
+  const [open, setOpen] = useState(false);
+  const [broken, setBroken] = useState(false);
+  const src = url ? toDirectImageUrl(url) : "";
+
+  if (!src || broken)
+    return (
+      <span className="text-gray-300 text-xl tracking-widest">No Image</span>
+    );
+
+  return (
+    <>
+      <Popover
+        placement="right"
+        mouseEnterDelay={0.15}
+        content={
+          <div className="w-[300px]">
+            <img
+              src={src}
+              alt={alt}
+              referrerPolicy="no-referrer"
+              className="w-full h-[300px] object-contain bg-gray-50 rounded-lg"
+            />
+            <div className="text-center text-[11px] text-gray-400 mt-1">
+              Bấm vào ảnh để xem full
+            </div>
+          </div>
+        }
+      >
+        <img
+          src={src}
+          alt={alt}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover cursor-zoom-in"
+          onClick={() => setOpen(true)}
+          onError={() => setBroken(true)}
+        />
+      </Popover>
+      {/* Modal xem ảnh full */}
+      <Image
+        src={src}
+        alt={alt}
+        style={{ display: "none" }}
+        preview={{ visible: open, src, onVisibleChange: setOpen }}
+      />
+    </>
+  );
+}
 
 export default function Catalog() {
   const { products } = useBaseProducts();
@@ -107,18 +161,7 @@ export default function Catalog() {
             className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col"
           >
             <div className="relative m-4 mb-0 h-[210px] bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
-              {p.image ? (
-                <img
-                  src={p.image}
-                  alt={p.name}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-gray-300 text-xl tracking-widest">
-                  No Image
-                </span>
-              )}
+              <ProductImage url={p.image} alt={p.name} />
               <span
                 className={`absolute top-2 right-2 text-[10px] font-bold tracking-widest px-2 py-1 rounded ${
                   p.inStock
