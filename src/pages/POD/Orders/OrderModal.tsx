@@ -1,7 +1,8 @@
 import { Button, Input, InputNumber, Modal, Select, message } from "antd";
 import { produce } from "immer";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  useBaseProducts,
   useDesigns,
   usePodOrderMutations,
   usePodVariants,
@@ -11,7 +12,8 @@ import {
   POD_STATUS,
   PodOrder,
   PodOrderItem,
-  findVariant,
+  findVariantForItem,
+  makeBlankName,
   podItemTotal,
   variantUnitPrice,
 } from "../../../models/pod";
@@ -108,6 +110,9 @@ export default function OrderModal({
   const isEdit = !!initial;
   const { variants } = usePodVariants();
   const { designs } = useDesigns();
+  const { products } = useBaseProducts();
+  // Map SKU phôi -> tên phôi, để tra bảng giá khớp cả khi item mang mã SKU
+  const blankName = useMemo(() => makeBlankName(products), [products]);
   const { stores } = useStores();
   const { selectedStoreId } = usePodStore();
   const { add, update } = usePodOrderMutations();
@@ -162,7 +167,7 @@ export default function OrderModal({
     setOrder((prev) =>
       produce(prev, (d) => {
         (d.items || []).forEach((it: PodOrderItem) => {
-          const v = findVariant(variants, it.productSku, it.size, it.color);
+          const v = findVariantForItem(variants, it, blankName);
           if (v) it.price = variantUnitPrice(v, it);
         });
       })
@@ -170,8 +175,10 @@ export default function OrderModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     variants.length,
+    products.length,
     JSON.stringify(
       (order.items || []).map((i) => [
+        i.productName,
         i.productSku,
         i.size,
         i.color,

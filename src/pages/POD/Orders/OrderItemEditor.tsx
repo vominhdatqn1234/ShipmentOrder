@@ -7,9 +7,10 @@ import {
   Tooltip,
   message,
 } from "antd";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { FiDownload, FiUploadCloud } from "react-icons/fi";
 import {
+  useBaseProducts,
   useDesignMutations,
   useDesigns,
   usePodColors,
@@ -18,7 +19,8 @@ import {
 import {
   PodOrder,
   PodOrderItem,
-  findVariant,
+  findVariantForItem,
+  makeBlankName,
   splitSizeFromColor,
   variantUnitPrice,
 } from "../../../models/pod";
@@ -244,6 +246,9 @@ function OrderItemEditor({
   const { variants } = usePodVariants();
   const { designs } = useDesigns();
   const { colors: podColors } = usePodColors();
+  const { products } = useBaseProducts();
+  // Map SKU phôi -> tên phôi, để tra bảng giá khớp cả khi item mang mã SKU
+  const blankName = useMemo(() => makeBlankName(products), [products]);
   const itemBg = colorToCss(item.color, podColors);
   const { add: addDesign, update: updateDesign } = useDesignMutations();
 
@@ -295,13 +300,15 @@ function OrderItemEditor({
   // Tự tính đơn giá theo bảng giá phôi POD khi phôi/size/màu/link/vùng in đổi.
   // Chỉ ghi đè khi tìm được biến thể khớp (tránh xoá giá đơn import từ Etsy).
   useEffect(() => {
-    const v = findVariant(variants, item.productSku, item.size, item.color);
+    const v = findVariantForItem(variants, item, blankName);
     if (!v) return;
     const price = variantUnitPrice(v, item);
     if (price !== (item.price || 0)) onPatchItem({ price });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     variants.length,
+    products.length,
+    item.productName,
     item.productSku,
     item.size,
     item.color,

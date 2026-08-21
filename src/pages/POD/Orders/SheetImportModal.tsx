@@ -24,9 +24,11 @@ import ExcelGrid from "./ExcelGrid";
 import {
   Design,
   PodVariant,
-  findVariant,
+  findVariantForItem,
+  makeBlankName,
   variantUnitPrice,
 } from "../../../models/pod";
+import { useBaseProducts } from "../../../hooks/usePod";
 
 /* ------------------------------- Field map ------------------------------- */
 
@@ -222,6 +224,10 @@ export default function SheetImportModal({
     sourceName: string
   ) => Promise<void>;
 }) {
+  // Map SKU phôi -> tên phôi, để tra bảng giá khớp cả khi sheet ghi mã SKU
+  const { products } = useBaseProducts();
+  const blankName = useMemo(() => makeBlankName(products), [products]);
+
   // Cột "Shop" là dropdown chọn từ danh sách shop của seller (được để trống)
   const FIELDS = useMemo(
     () =>
@@ -393,7 +399,7 @@ export default function SheetImportModal({
         };
         // Chưa có giá -> tính theo bảng giá phôi POD (nếu tra được biến thể)
         if (!item.price) {
-          const v = findVariant(variants, item.productSku, item.size, item.color);
+          const v = findVariantForItem(variants, item, blankName);
           item.price = variantUnitPrice(v, item);
         }
         return item;

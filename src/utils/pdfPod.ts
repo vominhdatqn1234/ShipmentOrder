@@ -5,10 +5,13 @@ import {
   PodOrderItem,
   PodStore,
   PodVariant,
-  findVariant,
+  findVariantForItem,
   splitSizeFromColor,
   variantUnitPrice,
 } from "../models/pod";
+
+/** Map SKU phôi -> tên phôi (truyền từ trang gọi, xem makeBlankName). */
+export type BlankNameFn = (sku?: string) => string;
 
 export type PdfOrderPreview = {
   id: string;
@@ -97,7 +100,8 @@ type ItemSegment = { sku: string; title: string; details: string[] };
 function buildItem(
   seg: ItemSegment,
   designs: Design[],
-  variants: PodVariant[]
+  variants: PodVariant[],
+  blankName?: BlankNameFn
 ): PodOrderItem {
   const { sku, title, details } = seg;
   const quantity = Number(
@@ -193,7 +197,7 @@ function buildItem(
   return {
     ...baseItem,
     price: variantUnitPrice(
-      findVariant(variants, baseItem.productSku, size, color),
+      findVariantForItem(variants, baseItem, blankName),
       baseItem
     ),
   };
@@ -202,7 +206,8 @@ function buildItem(
 function parseItems(
   lines: string[],
   designs: Design[],
-  variants: PodVariant[]
+  variants: PodVariant[],
+  blankName?: BlankNameFn
 ): PodOrderItem[] {
   const countIndex = lines.findIndex((line) => /^\d+ items?$/.test(line));
   if (countIndex < 0) return [];
@@ -254,13 +259,19 @@ function parseItems(
     });
   }
 
-  return segments.map((seg) => buildItem(seg, designs, variants));
+  return segments.map((seg) => buildItem(seg, designs, variants, blankName));
 }
 
 /** Đọc packing slip PDF của Etsy (mỗi trang tương ứng một đơn hàng). */
 export async function parseEtsyPackingSlipPdf(
   file: File,
-  options: { storeId?: string; store?: PodStore; designs: Design[]; variants: PodVariant[] }
+  options: {
+    storeId?: string;
+    store?: PodStore;
+    designs: Design[];
+    variants: PodVariant[];
+    blankName?: BlankNameFn;
+  }
 ): Promise<PdfOrderPreview[]> {
   const data = new Uint8Array(await file.arrayBuffer());
   const pdf = await getDocument({ data }).promise;
@@ -289,7 +300,12 @@ export async function parseEtsyPackingSlipPdf(
       if (!code || shipTo < 0 || shipEnd < 0) continue;
 
       const shipByDate = findDateAfter(lines, /^Scheduled to ship by$/i);
-      const items = parseItems(lines, options.designs, options.variants);
+      const items = parseItems(
+        lines,
+        options.designs,
+        options.variants,
+        options.blankName
+      );
       if (!items.length) continue;
       const address = parseAddress(lines.slice(shipTo + 1, shipEnd));
       const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);

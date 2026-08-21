@@ -31,6 +31,7 @@ import { useLocation } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
 import OrdersPackingSlips from "./OrdersPackingSlips";
 import {
+  useBaseProducts,
   useDesigns,
   usePodImportQueue,
   usePodImportQueueMutations,
@@ -44,7 +45,9 @@ import {
   POD_STATUS_TABS,
   PodOrder,
   PodOrderStatus,
-  findVariant,
+  PodVariant,
+  findVariantForItem,
+  makeBlankName,
 } from "../../../models/pod";
 import { usePodStore } from "../../../store/usePodStore";
 import { downloadCSV, parseCSV, parseVariations, toCSV } from "../../../utils/csvPod";
@@ -59,6 +62,7 @@ import {
   FULL_PRINT_LABEL,
   SPECIAL_PRINT_AREA_LABEL,
   podItemTotal,
+  variantUnitPrice,
 } from "../../../models/pod";
 
 type ViewTab = "list" | "import" | "create";
@@ -102,17 +106,23 @@ export default function Orders() {
   const { stores } = useStores();
   const { designs } = useDesigns();
   const { variants } = usePodVariants();
+  const { products } = useBaseProducts();
+  // Map SKU phôi -> tên phôi, để tra bảng giá khớp cả khi item mang mã SKU
+  const blankName = useMemo(() => makeBlankName(products), [products]);
   const { selectedStoreId } = usePodStore();
   // Phụ phí vùng in đặc biệt lấy theo bảng giá phôi POD (In vùng phụ).
   // Bảng giá có hàng nghìn dòng nên nhớ lại kết quả đã tra theo phôi/size/màu.
   const variantCache = useMemo(
-    () => new Map<string, ReturnType<typeof findVariant>>(),
-    [variants]
+    () => new Map<string, PodVariant | undefined>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [variants, products]
   );
   const variantOf = (it: PodOrderItem) => {
-    const key = `${it.productSku || ""}|${it.size || ""}|${it.color || ""}`;
+    const key = `${it.productName || ""}|${it.productSku || ""}|${
+      it.size || ""
+    }|${it.color || ""}`;
     if (variantCache.has(key)) return variantCache.get(key);
-    const v = findVariant(variants, it.productSku, it.size, it.color);
+    const v = findVariantForItem(variants, it, blankName);
     variantCache.set(key, v);
     return v;
   };
@@ -235,6 +245,7 @@ export default function Orders() {
         store,
         designs,
         variants,
+        blankName,
       });
       // Chưa có shop -> ghi tên shop mặc định để dễ nhận biết, gán shop sau
       preview.forEach((p: any) => {
@@ -723,6 +734,48 @@ export default function Orders() {
         toISO(pick("Date Paid")) ||
         toISO(pick("Date Shipped")) ||
         "";
+      // Dựng item trước để tính tổng từ chính đơn giá của item (CSV Etsy có
+      // file thiếu cột Price/Item Total -> fallback sang bảng giá phôi POD,
+      // tránh đơn bị lưu total = 0 rồi treo luôn ở đó).
+      const csvItems = items.map((it: any) => {
+        const v = parseVariations(it["Variations"]);
+        const csvSku = (it["SKU"] || "").trim();
+        // Type/Màu lấy TỪ VARIATIONS (Styles/Colors), không lấy từ cột SKU.
+        // Không có trong Variations thì để trống.
+        const typeVal = v.style;
+        // Tự đồng bộ link thiết kế từ thư viện nếu SKU (thiết kế) khớp
+        const design = designs.find(
+          (d) => d.sku.toLowerCase() === csvSku.toLowerCase()
+        );
+        const item: any = {
+          productName: it["Item Name"] || typeVal || "",
+          productSku: typeVal,
+          sku: csvSku,
+          color: v.color,
+          size: v.size,
+          personalization: v.personalization,
+          // Bản gốc khách up (ô vàng) — set sẵn để không bị suy ra từ SKU
+          origTitle: it["Item Name"] || typeVal || "",
+          origType: typeVal,
+          origColor: v.color,
+          origSize: v.size,
+          quantity: parseInt(it["Quantity"]) || 1,
+          price: parseFloat(it["Price"]) || 0,
+          frontUrl: design?.frontUrl || "",
+          backUrl: design?.backUrl || "",
+          mockupUrl: design?.mockupUrl || "",
+          extraAreas: design?.extraAreas || [],
+          note: "",
+        };
+        // CSV không có giá -> tính theo bảng giá phôi POD (nếu tra được biến thể)
+        if (!item.price) {
+          item.price = variantUnitPrice(
+            findVariantForItem(variants, item, blankName),
+            item
+          );
+        }
+        return item;
+      });
       return {
         id: `etsy-${oid}`,
         data: {
@@ -743,44 +796,22 @@ export default function Orders() {
           state: pick("Ship State"),
           zip: pick("Ship Zipcode"),
           country: pick("Ship Country") || "United States",
-          items: items.map((it: any) => {
-            const v = parseVariations(it["Variations"]);
-            const csvSku = (it["SKU"] || "").trim();
-            // Type/Màu lấy TỪ VARIATIONS (Styles/Colors), không lấy từ cột SKU.
-            // Không có trong Variations thì để trống.
-            const typeVal = v.style;
-            // Tự đồng bộ link thiết kế từ thư viện nếu SKU (thiết kế) khớp
-            const design = designs.find(
-              (d) => d.sku.toLowerCase() === csvSku.toLowerCase()
-            );
-            return {
-              productName: it["Item Name"] || typeVal || "",
-              productSku: typeVal,
-              sku: csvSku,
-              color: v.color,
-              size: v.size,
-              personalization: v.personalization,
-              // Bản gốc khách up (ô vàng) — set sẵn để không bị suy ra từ SKU
-              origTitle: it["Item Name"] || typeVal || "",
-              origType: typeVal,
-              origColor: v.color,
-              origSize: v.size,
-              quantity: parseInt(it["Quantity"]) || 1,
-              price: parseFloat(it["Price"]) || 0,
-              frontUrl: design?.frontUrl || "",
-              backUrl: design?.backUrl || "",
-              mockupUrl: design?.mockupUrl || "",
-              extraAreas: design?.extraAreas || [],
-              note: "",
-            };
-          }),
+          items: csvItems,
           note: "",
           // Tin nhắn khách để TRỐNG, nhân viên tự nhập tay (không lấy Personalization)
           csCustomerMsg: "",
-          total: items.reduce(
-            (s: number, it: any) => s + (parseFloat(it["Item Total"]) || 0),
-            0
-          ),
+          // Tổng: giữ nguyên ưu tiên cột "Item Total" của Etsy. Chỉ khi file
+          // không có/để trống cột này mới lấy đơn giá × SL của item (đơn giá
+          // đã fallback sang bảng giá phôi ở trên) — tránh lưu total = 0.
+          total:
+            items.reduce(
+              (s: number, it: any) => s + (parseFloat(it["Item Total"]) || 0),
+              0
+            ) ||
+            csvItems.reduce(
+              (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1),
+              0
+            ),
           created,
         },
       };

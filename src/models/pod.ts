@@ -223,6 +223,50 @@ export function findVariant(
 }
 
 /**
+ * Tìm biến thể phôi cho 1 ITEM của đơn — dùng NHIỀU ứng viên tên phôi.
+ *
+ * Lý do: bảng giá phôi (`podVariants.product`) lưu TÊN phôi (vd "Gildan 18000"),
+ * nhưng item của đơn có thể mang mã SKU ("GIL18000") ở `productSku` tuỳ nguồn
+ * (sheet import / Etsy CSV / tạo tay). Nếu chỉ tra bằng `productSku` thì tra hụt
+ * → `variantUnitPrice` trả về 0 → đơn lưu total = 0 vĩnh viễn.
+ *
+ * Thứ tự ưu tiên (giống hệt admin portal): productName → tên phôi suy từ SKU
+ * (bảng baseProducts) → productSku.
+ *
+ * @param blankName  Hàm map SKU → tên phôi (thường từ danh mục baseProducts).
+ *                   Không truyền cũng chạy, chỉ mất 1 ứng viên.
+ */
+export function findVariantForItem(
+  variants: PodVariant[],
+  item: { productName?: string; productSku?: string; size?: string; color?: string },
+  blankName?: (sku?: string) => string
+): PodVariant | undefined {
+  const cands = [
+    item.productName,
+    blankName ? blankName(item.productSku) : "",
+    item.productSku,
+  ];
+  const seen = new Set<string>();
+  for (const c of cands) {
+    const k = _norm(c);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    const v = findVariant(variants, c, item.size, item.color);
+    if (v) return v;
+  }
+  return undefined;
+}
+
+/** Map SKU → tên phôi từ danh mục baseProducts (fallback: trả lại chính SKU). */
+export function makeBlankName(products: BaseProduct[]): (sku?: string) => string {
+  const bySku = new Map<string, string>();
+  products.forEach((p) => {
+    if (p.sku) bySku.set(p.sku, p.name || p.sku);
+  });
+  return (sku?: string) => bySku.get(sku || "") || sku || "";
+}
+
+/**
  * Đơn giá 1 item theo bảng giá phôi POD:
  * - Chỉ in 1 mặt (không có link BACK/MOCKUP) → Giá Teement.
  * - Có link BACK hoặc MOCKUP (in 2 mặt) → Giá + Giá ship + In 1 mặt.
